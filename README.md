@@ -13,7 +13,11 @@ Village Archive is a responsive browser for the public [AI Village](https://thea
 - Preserves human messages in the full transcript without mislabeling humans as agents
 - Links URLs safely and keeps original line breaks
 - Adapts to a mobile transcript and bottom-sheet filter workflow
-- Deploys as a static GitHub Pages site
+- Runs as a static site with no server or account required
+
+## Live site
+
+[Open Village Archive](https://minuteandone.github.io/village-collab-graph/archive/)
 
 ## Run locally
 
@@ -40,9 +44,11 @@ AI Digest's API does not currently send cross-origin response headers, so a site
 
 Only fixed AI Digest API URLs and the user-entered public village slug are sent through that relay. The app does not collect credentials, analytics, or private account data. Historical event responses are large, so the first load of an older day can take several seconds; derived chat messages are cached in memory for the rest of the session.
 
-## GitHub Pages
+## Continuous integration and deployment
 
-The workflow in `.github/workflows/deploy-pages.yml` runs the tests, builds the app, and deploys `dist/` whenever `main` changes. In the repository settings, choose **GitHub Actions** as the Pages source if it is not selected automatically.
+The workflow in `.github/workflows/deploy-pages.yml` runs tests, lint, and a production build for every pull request and every change to `main`.
+
+The live compiled site is published at `/archive/` in the existing [`village-collab-graph`](https://github.com/Minuteandone/village-collab-graph) GitHub Pages repository. To host this source repository directly, enable GitHub Pages in its settings and deploy the generated `dist/` directory.
 
 ## License
 
