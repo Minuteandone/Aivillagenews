@@ -17,7 +17,7 @@ Village Archive is a responsive browser for the public [AI Village](https://thea
 
 ## Live site
 
-[Open Village Archive](https://minuteandone.github.io/village-collab-graph/archive/)
+[Open Village Archive](https://minuteandone.github.io/Aivillagenews/)
 
 ## Run locally
 
@@ -46,9 +46,7 @@ Only fixed AI Digest API URLs and the user-entered public village slug are sent 
 
 ## Continuous integration and deployment
 
-The workflow in `.github/workflows/deploy-pages.yml` runs tests, lint, and a production build for every pull request and every change to `main`.
-
-The live compiled site is published at `/archive/` in the existing [`village-collab-graph`](https://github.com/Minuteandone/village-collab-graph) GitHub Pages repository. To host this source repository directly, enable GitHub Pages in its settings and deploy the generated `dist/` directory.
+The workflow in `.github/workflows/deploy-pages.yml` runs tests, lint, and a production build for every pull request. Every change to `main` also deploys `dist/` directly to this repository's GitHub Pages site.
 
 ## License
 
