@@ -3,7 +3,14 @@ import { AgentAvatar } from "./AgentAvatar";
 import { DayPicker } from "./DayPicker";
 import { CheckIcon, HashIcon, UsersIcon } from "./Icons";
 import { formatCount } from "../lib/format";
-import type { AgentOption, RoomOption } from "../types";
+import type { ArchiveView } from "./ViewSwitcher";
+import type {
+  AgentOption,
+  GitAuthorOption,
+  GitPlatform,
+  GitProjectOption,
+  RoomOption,
+} from "../types";
 
 interface FiltersPanelProps {
   mobile?: boolean;
@@ -24,6 +31,16 @@ interface FiltersPanelProps {
   totalMessages: number;
   roomMessageCount: number;
   transportLabel: string;
+  viewMode: ArchiveView;
+  gitSources: Record<GitPlatform, boolean>;
+  gitSourceCounts: Record<GitPlatform, number>;
+  onToggleGitSource: (platform: GitPlatform) => void;
+  gitProjects: GitProjectOption[];
+  selectedGitProjectId: string;
+  onSelectGitProject: (projectId: string) => void;
+  gitAuthors: GitAuthorOption[];
+  selectedGitAuthorId: string;
+  onSelectGitAuthor: (authorId: string) => void;
 }
 
 export function FiltersPanel({
@@ -45,6 +62,16 @@ export function FiltersPanel({
   totalMessages,
   roomMessageCount,
   transportLabel,
+  viewMode,
+  gitSources,
+  gitSourceCounts,
+  onToggleGitSource,
+  gitProjects,
+  selectedGitProjectId,
+  onSelectGitProject,
+  gitAuthors,
+  selectedGitAuthorId,
+  onSelectGitAuthor,
 }: FiltersPanelProps) {
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -86,7 +113,69 @@ export function FiltersPanel({
         )}
       </section>
 
-      {!mobile && (
+      {viewMode === "git" && (
+        <>
+          <section className="filter-section" aria-labelledby={mobile ? "mobile-sources" : "desktop-sources"}>
+            <h2 id={mobile ? "mobile-sources" : "desktop-sources"}>Sources</h2>
+            <div className="filter-list">
+              {(["github", "gitlab"] as const).map((platform) => (
+                <button
+                  type="button"
+                  className="filter-row"
+                  aria-pressed={gitSources[platform]}
+                  onClick={() => onToggleGitSource(platform)}
+                  key={platform}
+                >
+                  <span className={`git-platform-mark git-platform-mark--${platform}`}>
+                    {platform === "github" ? "GH" : "GL"}
+                  </span>
+                  <span className="filter-row__label">
+                    {platform === "github" ? "GitHub · ai-village-agents" : "GitLab · group 136149641"}
+                  </span>
+                  <span className="filter-row__count">{formatCount(gitSourceCounts[platform])}</span>
+                  {mobile && gitSources[platform] && <CheckIcon className="row-check" />}
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <section className="filter-section git-filter-section" aria-labelledby={mobile ? "mobile-project" : "desktop-project"}>
+            <label id={mobile ? "mobile-project" : "desktop-project"} htmlFor={mobile ? "mobile-git-project" : "desktop-git-project"}>Project</label>
+            <select
+              id={mobile ? "mobile-git-project" : "desktop-git-project"}
+              className="git-filter-select"
+              value={selectedGitProjectId}
+              onChange={(event) => onSelectGitProject(event.target.value)}
+            >
+              <option value="all">All projects · {formatCount(gitProjects.length)}</option>
+              {gitProjects.map((project) => (
+                <option value={project.id} key={project.id}>
+                  {project.platform === "github" ? "GH" : "GL"} · {project.path} ({formatCount(project.count)})
+                </option>
+              ))}
+            </select>
+          </section>
+
+          <section className="filter-section git-filter-section" aria-labelledby={mobile ? "mobile-author" : "desktop-author"}>
+            <label id={mobile ? "mobile-author" : "desktop-author"} htmlFor={mobile ? "mobile-git-author" : "desktop-git-author"}>Authors</label>
+            <select
+              id={mobile ? "mobile-git-author" : "desktop-git-author"}
+              className="git-filter-select"
+              value={selectedGitAuthorId}
+              onChange={(event) => onSelectGitAuthor(event.target.value)}
+            >
+              <option value="all">All authors · {formatCount(gitAuthors.length)}</option>
+              {gitAuthors.map((author) => (
+                <option value={author.id} key={author.id}>
+                  {author.name} ({formatCount(author.count)})
+                </option>
+              ))}
+            </select>
+          </section>
+        </>
+      )}
+
+      {!mobile && viewMode === "timeline" && (
         <section className="filter-section" aria-labelledby="desktop-rooms">
           <h2 id="desktop-rooms">Rooms</h2>
           <div className="filter-list">
@@ -117,7 +206,7 @@ export function FiltersPanel({
         </section>
       )}
 
-      <section className="filter-section agents-section" aria-labelledby={mobile ? "mobile-agents" : "desktop-agents"}>
+      {viewMode === "timeline" && <section className="filter-section agents-section" aria-labelledby={mobile ? "mobile-agents" : "desktop-agents"}>
         <h2 id={mobile ? "mobile-agents" : "desktop-agents"}>Agents</h2>
         <div className="filter-list agent-list">
           <button
@@ -149,7 +238,7 @@ export function FiltersPanel({
             <p className="empty-filter-list">No agent messages in this room.</p>
           )}
         </div>
-      </section>
+      </section>}
 
       {!mobile && (
         <p className="data-route" aria-live="polite">

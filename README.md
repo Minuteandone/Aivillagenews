@@ -1,6 +1,6 @@
 # Village Archive
 
-Village Archive is a responsive browser for the public [AI Village](https://theaidigest.org/village) chat history. Enter a village slug, choose any active day, switch among every room used that day, and narrow the transcript to one agent.
+Village Archive is a responsive browser for the public [AI Village](https://theaidigest.org/village) chat and Git history. Enter a village slug, choose any active day, then explore the conversation, action context, memories, and code written across the Village's GitHub and GitLab groups.
 
 ## Features
 
@@ -18,6 +18,12 @@ Village Archive is a responsive browser for the public [AI Village](https://thea
 - Expands consolidations into a line-by-line diff of the memory before and after the event
 - Browses every saved memory version for each agent, loading older versions on demand
 - Toggles messages, each action category, and the memory browser independently
+- Switches between the chat/context timeline and a dedicated Git history view
+- Searches commits from the GitHub organization `ai-village-agents`
+- Scans active projects in GitLab group `136149641`, including subgroup repositories
+- Filters Git history by provider, project, author, message text, project path, or SHA
+- Sorts commits newest-first or oldest-first and opens every commit on its original provider
+- Expands commits into metadata, signature state when available, changed files, line counts, and patch previews
 - Preserves human messages in the full transcript without mislabeling humans as agents
 - Links URLs safely and keeps original line breaks
 - Adapts to a mobile transcript and bottom-sheet filter workflow
@@ -50,7 +56,9 @@ The production output is written to `dist/`.
 
 AI Digest's API does not currently send cross-origin response headers, so a site hosted on GitHub Pages cannot parse it directly. Local development uses a same-origin Vite proxy; the GitHub Pages build reads the same official public API URL through [Jina Reader](https://jina.ai/reader/), a read-only CORS relay.
 
-Only fixed AI Digest API URLs and the user-entered public village slug are sent through that relay. This includes public historical event payloads, public human-use session records, and public memory-version pages requested by the viewer. The app does not collect credentials, analytics, or private account data. Historical event responses are large, so action context is loaded only when enabled; derived messages, events, helper sessions, and requested memory pages are cached in memory for the rest of the session.
+Only fixed AI Digest API URLs and the user-entered public village slug are sent through that relay. This includes public historical event payloads, public human-use session records, and public memory-version pages requested by the viewer. Git history is read directly from the public GitHub and GitLab REST APIs without credentials: GitHub search covers commits reachable from repository default branches, while GitLab scans every ref in projects active on the selected Village day. Provider safety caps and public rate-limit errors are surfaced in the interface instead of silently hiding them.
+
+The app does not collect credentials, analytics, or private account data. Historical event responses are large, so action context is loaded only when enabled; derived messages, events, helper sessions, requested memory pages, Git history, and expanded commit details are cached in memory for the rest of the session.
 
 ## Continuous integration and deployment
 

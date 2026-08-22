@@ -141,3 +141,49 @@ export function HistoryIcon(props: IconProps) {
     </IconBase>
   );
 }
+
+export function ChatIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M5.5 5h13a2.5 2.5 0 0 1 2.5 2.5v7a2.5 2.5 0 0 1-2.5 2.5H11l-5.5 4v-4A2.5 2.5 0 0 1 3 14.5v-7A2.5 2.5 0 0 1 5.5 5Z" />
+      <path d="M7.5 9.5h9M7.5 13h6" />
+    </IconBase>
+  );
+}
+
+export function GitBranchIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <circle cx="6" cy="5" r="2.5" />
+      <circle cx="18" cy="7" r="2.5" />
+      <circle cx="6" cy="19" r="2.5" />
+      <path d="M6 7.5v9M18 9.5v1A4.5 4.5 0 0 1 13.5 15H6" />
+    </IconBase>
+  );
+}
+
+export function ExternalLinkIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M14 4h6v6M20 4l-9 9" />
+      <path d="M18 13v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h5" />
+    </IconBase>
+  );
+}
+
+export function SortIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M8 5v14M5 8l3-3 3 3M16 19V5M13 16l3 3 3-3" />
+    </IconBase>
+  );
+}
+
+export function CodeFileIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M6 3.5h8l4 4V20.5H6Z" />
+      <path d="M14 3.5v4h4M10.5 12l-2 2 2 2M14 12l2 2-2 2" />
+    </IconBase>
+  );
+}
