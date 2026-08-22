@@ -17,6 +17,7 @@ interface TimelineListProps {
   showRoomLabels: boolean;
   loading: boolean;
   onOpenMemoryPair: (activity: ActivityEvent, pair: MemoryPair) => void;
+  onOpenAgent?: (agentId: string) => void;
 }
 function splitTrailingPunctuation(value: string): [string, string] {
   const match = value.match(/^(.*?)([.,!?;:]+)?$/);
@@ -30,7 +31,7 @@ function formatEstimatedDuration(minutes: number): string {
   return `${hours}h${remainingMinutes ? ` ${remainingMinutes}m` : ""}`;
 }
 
-function MessageText({ content }: { content: string }) {
+export function MessageText({ content }: { content: string }) {
   const pieces = useMemo(() => content.split(/(https?:\/\/[^\s]+)/g), [content]);
 
   return (
@@ -75,10 +76,12 @@ function ContextMessageRow({
   message,
   roomName,
   showRoomLabel,
+  onOpenAgent,
 }: {
   message: ContextChatMessage;
   roomName: string | null;
   showRoomLabel: boolean;
+  onOpenAgent?: (agentId: string) => void;
 }) {
   return (
     <li className={`message-row message-row--context message-row--${message.contextKind}`}>
@@ -89,7 +92,17 @@ function ContextMessageRow({
       />
       <article>
         <header className="message-row__header">
-          <strong>{message.speakerName}</strong>
+          {message.speakerKind === "agent" && onOpenAgent ? (
+            <button
+              type="button"
+              className="agent-profile-link"
+              onClick={() => onOpenAgent(message.speakerId)}
+            >
+              {message.speakerName}
+            </button>
+          ) : (
+            <strong>{message.speakerName}</strong>
+          )}
           <time dateTime={message.createdAt}>{formatMemoryTimestamp(message.createdAt)}</time>
           {showRoomLabel && roomName && (
             <span className="message-row__room">#{roomName}</span>
@@ -218,13 +231,15 @@ interface ActivityRowProps {
   roomName: string | null;
   showRoomLabel: boolean;
   onOpenMemoryPair: (activity: ActivityEvent, pair: MemoryPair) => void;
+  onOpenAgent?: (agentId: string) => void;
 }
 
-function ActivityRow({
+export function ActivityRow({
   activity,
   roomName,
   showRoomLabel,
   onOpenMemoryPair,
+  onOpenAgent,
 }: ActivityRowProps) {
   const [expanded, setExpanded] = useState(false);
   const isConsolidation = activity.kind === "consolidation";
@@ -252,7 +267,17 @@ function ActivityRow({
         {icon}
         <div className="activity-row__copy">
           <header>
-            <strong>{activity.agentName}</strong>
+            {onOpenAgent ? (
+              <button
+                type="button"
+                className="agent-profile-link"
+                onClick={() => onOpenAgent(activity.agentId)}
+              >
+                {activity.agentName}
+              </button>
+            ) : (
+              <strong>{activity.agentName}</strong>
+            )}
             <time dateTime={activity.createdAt}>{formatVillageTime(activity.createdAt)}</time>
             {isConsolidation && <span className="activity-row__badge">Consolidated memory</span>}
             {activity.status && (
@@ -303,6 +328,7 @@ export function TimelineList({
   showRoomLabels,
   loading,
   onOpenMemoryPair,
+  onOpenAgent,
 }: TimelineListProps) {
   const roomNames = useMemo(
     () => new Map(rooms.map((room) => [room.id, room.name])),
@@ -331,6 +357,7 @@ export function TimelineList({
               roomName={item.activity.roomId ? (roomNames.get(item.activity.roomId) ?? null) : null}
               showRoomLabel={showRoomLabels}
               onOpenMemoryPair={onOpenMemoryPair}
+              onOpenAgent={onOpenAgent}
               key={`activity-${item.activity.id}`}
             />
           );
@@ -342,6 +369,7 @@ export function TimelineList({
               message={item.message}
               roomName={item.message.roomId ? (roomNames.get(item.message.roomId) ?? null) : null}
               showRoomLabel={showRoomLabels}
+              onOpenAgent={onOpenAgent}
               key={`context-${item.message.id}`}
             />
           );
@@ -357,7 +385,17 @@ export function TimelineList({
             />
             <article>
               <header className="message-row__header">
-                <strong>{message.speakerName}</strong>
+                {message.speakerKind === "agent" && onOpenAgent ? (
+                  <button
+                    type="button"
+                    className="agent-profile-link"
+                    onClick={() => onOpenAgent(message.speakerId)}
+                  >
+                    {message.speakerName}
+                  </button>
+                ) : (
+                  <strong>{message.speakerName}</strong>
+                )}
                 <time dateTime={message.createdAt}>{formatVillageTime(message.createdAt)}</time>
                 {showRoomLabels && (
                   <span className="message-row__room">

@@ -1,6 +1,6 @@
 import { Fragment, type ReactNode } from "react";
 
-const INLINE_PATTERN = /(\*\*[^*]+\*\*|`[^`]+`|https?:\/\/[^\s]+)/g;
+const INLINE_PATTERN = /(\[[^\]]+\]\(https?:\/\/[^)]+\)|\*\*[^*]+\*\*|`[^`]+`|https?:\/\/[^\s]+)/g;
 
 function trimUrlPunctuation(value: string): [string, string] {
   const match = value.match(/^(.*?)([.,!?;:]+)?$/);
@@ -9,6 +9,19 @@ function trimUrlPunctuation(value: string): [string, string] {
 
 function renderInline(value: string): ReactNode[] {
   return value.split(INLINE_PATTERN).map((piece, index) => {
+    const markdownLink = piece.match(/^\[([^\]]+)\]\((https?:\/\/[^)]+)\)$/);
+    if (markdownLink) {
+      return (
+        <a
+          href={markdownLink[2]}
+          target="_blank"
+          rel="noreferrer noopener"
+          key={`${index}-${markdownLink[2]}`}
+        >
+          {markdownLink[1]}
+        </a>
+      );
+    }
     if (piece.startsWith("**") && piece.endsWith("**")) {
       return <strong key={`${index}-${piece.slice(0, 12)}`}>{piece.slice(2, -2)}</strong>;
     }

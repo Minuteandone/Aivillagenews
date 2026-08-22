@@ -13,6 +13,11 @@ export interface ApiAgent {
   name: string;
   emoji?: string | null;
   modelString?: string | null;
+  statusMessage?: string | null;
+  goal?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  isParticipating?: boolean;
 }
 
 export interface ApiChatRoom {
@@ -217,11 +222,34 @@ export interface VillageData {
   id: string;
   slug: string;
   name: string;
+  villageGoal?: string | null;
   agents: ApiAgent[];
   rooms: ApiChatRoom[];
   dates: string[];
   latestDate: string;
   latestMessages: ChatMessage[];
+}
+
+export interface AgentProfileRecord {
+  agentId: string;
+  firstMessage: ChatMessage | null;
+  lastMessage: ChatMessage | null;
+  humanHelperRequests: ActivityEvent[];
+}
+
+export interface AgentProfilesIndex {
+  version: number;
+  villageId: string;
+  villageSlug: string;
+  generatedAt: string;
+  indexedThroughDate: string;
+  profiles: Record<string, AgentProfileRecord>;
+}
+
+export interface AgentStory {
+  markdown: string;
+  sourceUrl: string;
+  attribution: string;
 }
 
 export interface RoomOption {

@@ -1,0 +1,65 @@
+name: Refresh agent profiles
+
+on:
+  schedule:
+    - cron: "20 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Refresh lifetime agent index
+        run: npm run profiles:update
+      - name: Run tests
+        run: npm test
+      - name: Run lint
+        run: npm run lint
+      - name: Build site
+        run: npm run build
+      - name: Commit refreshed index
+        run: |
+          if git diff --quiet -- public/data/agent-profiles.json; then
+            echo "Agent profile index is already current."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/data/agent-profiles.json
+          git commit -m "chore: refresh agent profile index"
+          git push
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+      - name: Upload site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: refresh
+    steps:
+      - name: Deploy site
+        id: deployment
+        uses: actions/deploy-pages@v4

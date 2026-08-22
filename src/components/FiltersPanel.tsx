@@ -98,20 +98,22 @@ export function FiltersPanel({
         </button>
       </form>
 
-      <section className="filter-section" aria-labelledby={mobile ? "mobile-day" : "desktop-day"}>
-        <h2 id={mobile ? "mobile-day" : "desktop-day"}>Day</h2>
-        {dates.length > 0 ? (
-          <DayPicker
-            dates={dates}
-            selectedDate={selectedDate}
-            messageCounts={messageCounts}
-            onSelectDate={onSelectDate}
-            variant={mobile ? "select" : "list"}
-          />
-        ) : (
-          <p className="filter-placeholder">Load a village to see its days.</p>
-        )}
-      </section>
+      {viewMode !== "agents" && (
+        <section className="filter-section" aria-labelledby={mobile ? "mobile-day" : "desktop-day"}>
+          <h2 id={mobile ? "mobile-day" : "desktop-day"}>Day</h2>
+          {dates.length > 0 ? (
+            <DayPicker
+              dates={dates}
+              selectedDate={selectedDate}
+              messageCounts={messageCounts}
+              onSelectDate={onSelectDate}
+              variant={mobile ? "select" : "list"}
+            />
+          ) : (
+            <p className="filter-placeholder">Load a village to see its days.</p>
+          )}
+        </section>
+      )}
 
       {viewMode === "git" && (
         <>
@@ -206,20 +208,24 @@ export function FiltersPanel({
         </section>
       )}
 
-      {viewMode === "timeline" && <section className="filter-section agents-section" aria-labelledby={mobile ? "mobile-agents" : "desktop-agents"}>
-        <h2 id={mobile ? "mobile-agents" : "desktop-agents"}>Agents</h2>
+      {(viewMode === "timeline" || viewMode === "agents") && <section className="filter-section agents-section" aria-labelledby={mobile ? "mobile-agents" : "desktop-agents"}>
+        <h2 id={mobile ? "mobile-agents" : "desktop-agents"}>
+          {viewMode === "agents" ? "Agent pages" : "Agents"}
+        </h2>
         <div className="filter-list agent-list">
-          <button
-            type="button"
-            className="filter-row"
-            aria-pressed={selectedAgentId === "all"}
-            onClick={() => onSelectAgent("all")}
-          >
-            <UsersIcon className="row-icon" />
-            <span className="filter-row__label">All agents</span>
-            <span className="filter-row__count">{formatCount(roomMessageCount)}</span>
-            {mobile && selectedAgentId === "all" && <CheckIcon className="row-check" />}
-          </button>
+          {viewMode === "timeline" && (
+            <button
+              type="button"
+              className="filter-row"
+              aria-pressed={selectedAgentId === "all"}
+              onClick={() => onSelectAgent("all")}
+            >
+              <UsersIcon className="row-icon" />
+              <span className="filter-row__label">All agents</span>
+              <span className="filter-row__count">{formatCount(roomMessageCount)}</span>
+              {mobile && selectedAgentId === "all" && <CheckIcon className="row-check" />}
+            </button>
+          )}
           {agents.map((agent) => (
             <button
               type="button"
@@ -235,7 +241,9 @@ export function FiltersPanel({
             </button>
           ))}
           {dates.length > 0 && agents.length === 0 && (
-            <p className="empty-filter-list">No agent messages in this room.</p>
+            <p className="empty-filter-list">
+              {viewMode === "agents" ? "No agent pages are available." : "No agent messages in this room."}
+            </p>
           )}
         </div>
       </section>}

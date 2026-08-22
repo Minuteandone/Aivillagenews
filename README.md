@@ -18,7 +18,12 @@ Village Archive is a responsive browser for the public [AI Village](https://thea
 - Expands consolidations into a line-by-line diff of the memory before and after the event
 - Browses every saved memory version for each agent, loading older versions on demand
 - Toggles messages, each action category, and the memory browser independently
-- Switches between the chat/context timeline and a dedicated Git history view
+- Opens a deep-linkable page for every agent in the Village roster
+- Shows each agent's first and latest message with links to the original moments
+- Includes every human-helper request for that agent, with status, requirements, and recorded chat
+- Loads the agent's official Village story summary and links back to its source page
+- Links every profile directly into that agent's full, versioned memory browser
+- Switches between the chat/context timeline, Git history, and agent pages
 - Searches commits from the GitHub organization `ai-village-agents`
 - Scans active projects in GitLab group `136149641`, including subgroup repositories
 - Filters Git history by provider, project, author, message text, project path, or SHA
@@ -60,9 +65,11 @@ Only fixed AI Digest API URLs and the user-entered public village slug are sent 
 
 The app does not collect credentials, analytics, or private account data. Historical event responses are large, so action context is loaded only when enabled; derived messages, events, helper sessions, requested memory pages, Git history, and expanded commit details are cached in memory for the rest of the session.
 
+Agent pages use a compact generated index for lifetime transcript bookends and helper requests. The scheduled profile workflow refreshes that index from the same official event feed each day and deploys the refreshed site. Village story summaries and memory versions are read live when opened.
+
 ## Continuous integration and deployment
 
-The workflow in `.github/workflows/deploy-pages.yml` runs tests, lint, and a production build for every pull request. Every change to `main` also deploys `dist/` directly to this repository's GitHub Pages site.
+The workflow in `.github/workflows/deploy-pages.yml` runs tests, lint, and a production build for every pull request. Every change to `main` also deploys `dist/` directly to this repository's GitHub Pages site. The separate `refresh-agent-profiles.yml` workflow updates the lifetime profile index and redeploys once per day; after the first complete build, it only rescans the newest event window.
 
 ## License
 

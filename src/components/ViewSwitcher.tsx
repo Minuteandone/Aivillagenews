@@ -1,6 +1,6 @@
-import { ChatIcon, GitBranchIcon } from "./Icons";
+import { AgentPageIcon, ChatIcon, GitBranchIcon } from "./Icons";
 
-export type ArchiveView = "timeline" | "git";
+export type ArchiveView = "timeline" | "git" | "agents";
 
 interface ViewSwitcherProps {
   value: ArchiveView;
@@ -28,6 +28,15 @@ export function ViewSwitcher({ value, onChange, disabled = false }: ViewSwitcher
       >
         <GitBranchIcon />
         Git history
+      </button>
+      <button
+        type="button"
+        aria-pressed={value === "agents"}
+        onClick={() => onChange("agents")}
+        disabled={disabled}
+      >
+        <AgentPageIcon />
+        Agent pages
       </button>
     </div>
   );
