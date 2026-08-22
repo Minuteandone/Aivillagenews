@@ -1,9 +1,13 @@
 import { mapCurrentMessages, mapEventsToMessages } from "./messages";
 import type {
   ApiEventsResponse,
+  ApiEvent,
+  ApiMemoriesResponse,
   ApiVillage,
   ApiVillageSummary,
   ChatMessage,
+  MemoryPair,
+  MemoryVersion,
   VillageData,
 } from "../types";
 
@@ -18,6 +22,8 @@ let transport: Transport = import.meta.env.DEV
     ? "direct"
     : "relay";
 const dayCache = new Map<string, ChatMessage[]>();
+const eventCache = new Map<string, ApiEvent[]>();
+const memoryCache = new Map<string, MemoryVersion[]>();
 
 export class VillageApiError extends Error {
   constructor(
@@ -169,14 +175,80 @@ export async function loadDayMessages(
 
   if (cached) return cached;
 
+  const events = await loadDayEvents(village.id, date, signal);
+  const messages = mapEventsToMessages(events, village.agents);
+  dayCache.set(cacheKey, messages);
+  return messages;
+}
+
+export function getCachedDayEvents(villageId: string, date: string): ApiEvent[] | null {
+  return eventCache.get(`${villageId}:${date}`) ?? null;
+}
+
+export async function loadDayEvents(
+  villageId: string,
+  date: string,
+  signal?: AbortSignal,
+): Promise<ApiEvent[]> {
+  const cacheKey = `${villageId}:${date}`;
+  const cached = eventCache.get(cacheKey);
+  if (cached) return cached;
+
   const response = await requestJson<ApiEventsResponse>(
-    `/api/events?villageId=${encodeURIComponent(village.id)}&date=${encodeURIComponent(date)}&page=1`,
+    `/api/events?villageId=${encodeURIComponent(villageId)}&date=${encodeURIComponent(date)}&page=1`,
     signal,
   );
 
   if (response.error) throw new VillageApiError(response.error);
 
-  const messages = mapEventsToMessages(response.events ?? [], village.agents);
-  dayCache.set(cacheKey, messages);
-  return messages;
+  const events = response.events ?? [];
+  eventCache.set(cacheKey, events);
+  return events;
+}
+
+export async function loadAgentMemories(
+  agentId: string,
+  beforeTimestamp?: number,
+  signal?: AbortSignal,
+): Promise<MemoryVersion[]> {
+  const cutoff = beforeTimestamp === undefined ? "latest" : Math.floor(beforeTimestamp).toString();
+  const cacheKey = `${agentId}:${cutoff}`;
+  const cached = memoryCache.get(cacheKey);
+  if (cached) return cached;
+
+  const query = beforeTimestamp === undefined ? "" : `?createdAt=${encodeURIComponent(cutoff)}`;
+  const response = await requestJson<ApiMemoriesResponse>(
+    `/api/agent/${encodeURIComponent(agentId)}/memories${query}`,
+    signal,
+  );
+
+  if (response.error) throw new VillageApiError(response.error);
+
+  const memories = [...(response.memories ?? [])].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  );
+  memoryCache.set(cacheKey, memories);
+  return memories;
+}
+
+export async function loadConsolidationMemoryPair(
+  agentId: string,
+  consolidationTimestamp: string,
+  signal?: AbortSignal,
+): Promise<MemoryPair> {
+  const eventTime = new Date(consolidationTimestamp).getTime();
+  const versions = await loadAgentMemories(agentId, eventTime + 1000, signal);
+  const currentIndex = versions.findIndex(
+    (version) => new Date(version.createdAt).getTime() <= eventTime + 1000,
+  );
+  const current = versions[currentIndex];
+
+  if (!current) {
+    throw new VillageApiError("No saved memory was found for this consolidation.");
+  }
+
+  return {
+    current,
+    previous: versions[currentIndex + 1] ?? null,
+  };
 }
