@@ -235,3 +235,87 @@ export interface AgentOption {
   name: string;
   count: number;
 }
+
+export type GitPlatform = "github" | "gitlab";
+
+export interface GitCommit {
+  id: string;
+  platform: GitPlatform;
+  sha: string;
+  shortSha: string;
+  projectId: string;
+  projectPath: string;
+  projectName: string;
+  title: string;
+  message: string;
+  authorName: string;
+  authorUsername: string | null;
+  authorEmail: string | null;
+  avatarUrl: string | null;
+  authoredAt: string;
+  committedAt: string;
+  webUrl: string;
+  parentShas: string[];
+  refName: string | null;
+}
+
+export type GitFileChangeType =
+  | "added"
+  | "modified"
+  | "deleted"
+  | "renamed"
+  | "copied"
+  | "unknown";
+
+export interface GitCommitFile {
+  id: string;
+  path: string;
+  previousPath: string | null;
+  changeType: GitFileChangeType;
+  additions: number | null;
+  deletions: number | null;
+  changes: number | null;
+  patch: string | null;
+  patchTruncated: boolean;
+  webUrl: string | null;
+}
+
+export interface GitCommitDetail {
+  additions: number | null;
+  deletions: number | null;
+  changes: number | null;
+  files: GitCommitFile[];
+  filesTruncated: boolean;
+  verified: boolean | null;
+  verificationReason: string | null;
+}
+
+export interface GitHistorySourceResult {
+  platform: GitPlatform;
+  status: "loaded" | "partial" | "error";
+  count: number;
+  detail: string;
+}
+
+export interface GitHistoryResult {
+  commits: GitCommit[];
+  sources: GitHistorySourceResult[];
+  warnings: string[];
+  githubTotalCount: number;
+  scannedGitLabProjects: number;
+  totalGitLabCandidateProjects: number;
+}
+
+export interface GitProjectOption {
+  id: string;
+  platform: GitPlatform;
+  name: string;
+  path: string;
+  count: number;
+}
+
+export interface GitAuthorOption {
+  id: string;
+  name: string;
+  count: number;
+}

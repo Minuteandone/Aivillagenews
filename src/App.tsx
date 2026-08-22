@@ -4,6 +4,8 @@ import {
   type ContextVisibility,
 } from "./components/ContextToolbar";
 import { FiltersPanel } from "./components/FiltersPanel";
+import { GitHistoryList } from "./components/GitHistoryList";
+import { GitHistoryToolbar } from "./components/GitHistoryToolbar";
 import { ClearFilterIcon, FilterIcon, HashIcon } from "./components/Icons";
 import {
   MemoryInspector,
@@ -11,6 +13,7 @@ import {
 } from "./components/MemoryInspector";
 import { TimelineList } from "./components/MessageList";
 import { MobileFilterDrawer } from "./components/MobileFilterDrawer";
+import { ViewSwitcher, type ArchiveView } from "./components/ViewSwitcher";
 import { buildTimelineItems, mapEventsToActivities } from "./lib/activities";
 import {
   activeTransport,
@@ -22,6 +25,12 @@ import {
 } from "./lib/api";
 import { formatDateLong, pluralizeItems, pluralizeMessages } from "./lib/format";
 import {
+  buildGitAuthorOptions,
+  buildGitProjectOptions,
+  filterGitCommits,
+  loadGitHistory,
+} from "./lib/gitHistory";
+import {
   buildAgentOptions,
   buildRoomOptions,
   filterMessages,
@@ -30,6 +39,8 @@ import type {
   ActivityEvent,
   ApiEvent,
   ChatMessage,
+  GitHistoryResult,
+  GitPlatform,
   HumanUseSession,
   MemoryPair,
   VillageData,
@@ -52,10 +63,23 @@ export default function App() {
   const [humanUseSessions, setHumanUseSessions] = useState<HumanUseSession[]>([]);
   const [selectedRoomId, setSelectedRoomId] = useState("all");
   const [selectedAgentId, setSelectedAgentId] = useState("all");
+  const [viewMode, setViewMode] = useState<ArchiveView>("timeline");
+  const [gitHistoryResult, setGitHistoryResult] = useState<GitHistoryResult | null>(null);
+  const [gitSources, setGitSources] = useState<Record<GitPlatform, boolean>>({
+    github: true,
+    gitlab: true,
+  });
+  const [selectedGitProjectId, setSelectedGitProjectId] = useState("all");
+  const [selectedGitAuthorId, setSelectedGitAuthorId] = useState("all");
+  const [gitSearch, setGitSearch] = useState("");
+  const [gitSort, setGitSort] = useState<"asc" | "desc">("desc");
   const [loadingVillage, setLoadingVillage] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [loadingActions, setLoadingActions] = useState(false);
+  const [loadingGitHistory, setLoadingGitHistory] = useState(false);
+  const [gitLoadingMessage, setGitLoadingMessage] = useState("Loading Git history…");
   const [error, setError] = useState("");
+  const [gitError, setGitError] = useState("");
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [contextVisibility, setContextVisibility] = useState<ContextVisibility>({
     messages: true,
@@ -72,11 +96,13 @@ export default function App() {
   const villageAbortRef = useRef<AbortController | null>(null);
   const dayAbortRef = useRef<AbortController | null>(null);
   const activityAbortRef = useRef<AbortController | null>(null);
+  const gitHistoryAbortRef = useRef<AbortController | null>(null);
   const activityRequestKeyRef = useRef<string | null>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
   const didInitialLoadRef = useRef(false);
   const memoryLaunchCounterRef = useRef(0);
   const actionsVisibleRef = useRef(false);
+  const viewModeRef = useRef<ArchiveView>("timeline");
 
   const roomOptions = useMemo(
     () => buildRoomOptions(messages, village?.rooms ?? []),
@@ -124,6 +150,41 @@ export default function App() {
     [activities, contextVisibility, messages, selectedAgentId, selectedRoomId],
   );
 
+  const gitCommits = useMemo(
+    () => gitHistoryResult?.commits ?? [],
+    [gitHistoryResult],
+  );
+
+  const gitSourceCounts = useMemo(
+    () => ({
+      github: gitCommits.filter((commit) => commit.platform === "github").length,
+      gitlab: gitCommits.filter((commit) => commit.platform === "gitlab").length,
+    }),
+    [gitCommits],
+  );
+
+  const gitProjectOptions = useMemo(
+    () => buildGitProjectOptions(gitCommits, gitSources),
+    [gitCommits, gitSources],
+  );
+
+  const gitAuthorOptions = useMemo(
+    () => buildGitAuthorOptions(gitCommits, gitSources, selectedGitProjectId),
+    [gitCommits, gitSources, selectedGitProjectId],
+  );
+
+  const visibleGitCommits = useMemo(
+    () =>
+      filterGitCommits(gitCommits, {
+        sources: gitSources,
+        projectId: selectedGitProjectId,
+        authorId: selectedGitAuthorId,
+        search: gitSearch,
+        sort: gitSort,
+      }),
+    [gitCommits, gitSearch, gitSort, gitSources, selectedGitAuthorId, selectedGitProjectId],
+  );
+
   const anyActionsVisible =
     contextVisibility.pauses ||
     contextVisibility.consolidations ||
@@ -142,7 +203,32 @@ export default function App() {
     return village?.agents.find((agent) => agent.id === selectedAgentId)?.name ?? "Unknown agent";
   }, [selectedAgentId, village?.agents]);
 
-  const hasActiveFilters = selectedRoomId !== "all" || selectedAgentId !== "all";
+  const selectedGitProjectName = useMemo(
+    () =>
+      selectedGitProjectId === "all"
+        ? ""
+        : (gitProjectOptions.find((project) => project.id === selectedGitProjectId)?.path ??
+          "Unknown project"),
+    [gitProjectOptions, selectedGitProjectId],
+  );
+
+  const selectedGitAuthorName = useMemo(
+    () =>
+      selectedGitAuthorId === "all"
+        ? ""
+        : (gitAuthorOptions.find((author) => author.id === selectedGitAuthorId)?.name ??
+          "Unknown author"),
+    [gitAuthorOptions, selectedGitAuthorId],
+  );
+
+  const timelineHasActiveFilters = selectedRoomId !== "all" || selectedAgentId !== "all";
+  const gitHasActiveFilters =
+    !gitSources.github ||
+    !gitSources.gitlab ||
+    selectedGitProjectId !== "all" ||
+    selectedGitAuthorId !== "all" ||
+    gitSearch.trim().length > 0;
+  const hasActiveFilters = viewMode === "git" ? gitHasActiveFilters : timelineHasActiveFilters;
 
   const updateTransportLabel = useCallback(() => {
     const route = activeTransport();
@@ -153,6 +239,32 @@ export default function App() {
           ? "Connected directly to the AI Village API"
           : "Checking the public archive route…",
     );
+  }, []);
+
+  const loadGitHistoryForDate = useCallback(async (date: string, force = false) => {
+    gitHistoryAbortRef.current?.abort();
+    const controller = new AbortController();
+    gitHistoryAbortRef.current = controller;
+    setLoadingGitHistory(true);
+    setGitLoadingMessage("Loading GitHub and GitLab history…");
+    setGitError("");
+
+    try {
+      const result = await loadGitHistory(
+        date,
+        controller.signal,
+        (message) => {
+          if (!controller.signal.aborted) setGitLoadingMessage(message);
+        },
+        force,
+      );
+      if (!controller.signal.aborted) setGitHistoryResult(result);
+    } catch (caughtError) {
+      const nextError = messageForError(caughtError);
+      if (nextError && !controller.signal.aborted) setGitError(nextError);
+    } finally {
+      if (!controller.signal.aborted) setLoadingGitHistory(false);
+    }
   }, []);
 
   const loadActionsForDate = useCallback(
@@ -199,6 +311,7 @@ export default function App() {
       villageAbortRef.current?.abort();
       dayAbortRef.current?.abort();
       activityAbortRef.current?.abort();
+      gitHistoryAbortRef.current?.abort();
       activityRequestKeyRef.current = null;
       const controller = new AbortController();
       villageAbortRef.current = controller;
@@ -206,9 +319,15 @@ export default function App() {
       setLoadingVillage(true);
       setLoadingMessages(true);
       setLoadingActions(false);
+      setLoadingGitHistory(false);
       setError("");
+      setGitError("");
       setEvents([]);
       setHumanUseSessions([]);
+      setGitHistoryResult(null);
+      setSelectedGitProjectId("all");
+      setSelectedGitAuthorId("all");
+      setGitSearch("");
       setMemoryLaunch(null);
 
       try {
@@ -225,6 +344,9 @@ export default function App() {
         if (actionsVisibleRef.current) {
           void loadActionsForDate(loadedVillage.id, loadedVillage.latestDate);
         }
+        if (viewModeRef.current === "git") {
+          void loadGitHistoryForDate(loadedVillage.latestDate);
+        }
       } catch (caughtError) {
         const nextError = messageForError(caughtError);
         if (nextError) setError(nextError);
@@ -236,7 +358,7 @@ export default function App() {
         }
       }
     },
-    [loadActionsForDate, updateTransportLabel],
+    [loadActionsForDate, loadGitHistoryForDate, updateTransportLabel],
   );
 
   useEffect(() => {
@@ -248,13 +370,25 @@ export default function App() {
       villageAbortRef.current?.abort();
       dayAbortRef.current?.abort();
       activityAbortRef.current?.abort();
+      gitHistoryAbortRef.current?.abort();
       activityRequestKeyRef.current = null;
     };
   }, [loadVillageBySlug]);
 
   useEffect(() => {
     if (transcriptRef.current) transcriptRef.current.scrollTop = 0;
-  }, [contextVisibility, selectedAgentId, selectedDate, selectedRoomId]);
+  }, [
+    contextVisibility,
+    gitSearch,
+    gitSort,
+    gitSources,
+    selectedAgentId,
+    selectedDate,
+    selectedGitAuthorId,
+    selectedGitProjectId,
+    selectedRoomId,
+    viewMode,
+  ]);
 
   const handleSelectDate = useCallback(
     async (date: string, force = false) => {
@@ -262,6 +396,7 @@ export default function App() {
 
       dayAbortRef.current?.abort();
       activityAbortRef.current?.abort();
+      gitHistoryAbortRef.current?.abort();
       activityRequestKeyRef.current = null;
       const controller = new AbortController();
       dayAbortRef.current = controller;
@@ -270,12 +405,21 @@ export default function App() {
       setMessages([]);
       setEvents([]);
       setHumanUseSessions([]);
+      setGitHistoryResult(null);
       setSelectedRoomId("all");
       setSelectedAgentId("all");
+      setSelectedGitProjectId("all");
+      setSelectedGitAuthorId("all");
+      setGitSearch("");
       setMemoryLaunch(null);
       setLoadingMessages(true);
       setLoadingActions(false);
       setError("");
+      setGitError("");
+
+      if (viewModeRef.current === "git") {
+        void loadGitHistoryForDate(date, force);
+      }
 
       try {
         const loadedMessages = await loadDayMessages(village, date, controller.signal);
@@ -298,10 +442,18 @@ export default function App() {
         }
       }
     },
-    [loadActionsForDate, selectedDate, updateTransportLabel, village],
+    [loadActionsForDate, loadGitHistoryForDate, selectedDate, updateTransportLabel, village],
   );
 
   const clearFilters = useCallback(() => {
+    if (viewModeRef.current === "git") {
+      setGitSources({ github: true, gitlab: true });
+      setSelectedGitProjectId("all");
+      setSelectedGitAuthorId("all");
+      setGitSearch("");
+      return;
+    }
+
     setSelectedRoomId("all");
     setSelectedAgentId("all");
   }, []);
@@ -310,6 +462,33 @@ export default function App() {
     setSelectedRoomId(roomId);
     setSelectedAgentId("all");
   }, []);
+
+  const handleToggleGitSource = useCallback((platform: GitPlatform) => {
+    setGitSources((current) => ({ ...current, [platform]: !current[platform] }));
+    setSelectedGitProjectId("all");
+    setSelectedGitAuthorId("all");
+  }, []);
+
+  const handleSelectGitProject = useCallback((projectId: string) => {
+    setSelectedGitProjectId(projectId);
+    setSelectedGitAuthorId("all");
+  }, []);
+
+  const handleViewModeChange = useCallback(
+    (nextView: ArchiveView) => {
+      viewModeRef.current = nextView;
+      setViewMode(nextView);
+      setError("");
+      setGitError("");
+      setMobileFiltersOpen(false);
+      setMemoryLaunch(null);
+
+      if (nextView === "git" && selectedDate && !gitHistoryResult) {
+        void loadGitHistoryForDate(selectedDate);
+      }
+    },
+    [gitHistoryResult, loadGitHistoryForDate, selectedDate],
+  );
 
   const handleContextToggle = useCallback(
     (key: keyof ContextVisibility) => {
@@ -376,8 +555,22 @@ export default function App() {
     onSelectAgent: setSelectedAgentId,
     totalMessages: messages.length,
     roomMessageCount,
-    transportLabel,
+    transportLabel:
+      viewMode === "git"
+        ? "Public read-only GitHub and GitLab APIs"
+        : transportLabel,
+    viewMode,
+    gitSources,
+    gitSourceCounts,
+    onToggleGitSource: handleToggleGitSource,
+    gitProjects: gitProjectOptions,
+    selectedGitProjectId,
+    onSelectGitProject: handleSelectGitProject,
+    gitAuthors: gitAuthorOptions,
+    selectedGitAuthorId,
+    onSelectGitAuthor: setSelectedGitAuthorId,
   };
+  const visibleError = viewMode === "git" ? gitError : error;
 
   return (
     <div className="app-shell">
@@ -402,41 +595,78 @@ export default function App() {
           <div>
             <h1>{selectedDate ? formatDateLong(selectedDate) : "Choose a village"}</h1>
             <div className="transcript-header__meta">
-              <span>{selectedRoomId === "all" ? "All rooms" : `#${selectedRoomName}`}</span>
-              <span aria-hidden="true">•</span>
-              <span>{pluralizeMessages(visibleMessages.length)}</span>
-              {hasActiveFilters && visibleMessages.length !== messages.length && (
-                <span className="muted-total">of {pluralizeMessages(messages.length)}</span>
-              )}
-              {selectedAgentName && <span className="active-agent-label">{selectedAgentName}</span>}
-              {contextChangesVisibleCount && (
-                <span className="timeline-visible-count">
-                  {pluralizeItems(timelineItems.length)} visible
-                </span>
+              {viewMode === "timeline" ? (
+                <>
+                  <span>{selectedRoomId === "all" ? "All rooms" : `#${selectedRoomName}`}</span>
+                  <span aria-hidden="true">•</span>
+                  <span>{pluralizeMessages(visibleMessages.length)}</span>
+                  {timelineHasActiveFilters && visibleMessages.length !== messages.length && (
+                    <span className="muted-total">of {pluralizeMessages(messages.length)}</span>
+                  )}
+                  {selectedAgentName && <span className="active-agent-label">{selectedAgentName}</span>}
+                  {contextChangesVisibleCount && (
+                    <span className="timeline-visible-count">
+                      {pluralizeItems(timelineItems.length)} visible
+                    </span>
+                  )}
+                </>
+              ) : (
+                <>
+                  <span>GitHub + GitLab</span>
+                  <span aria-hidden="true">•</span>
+                  <span>{visibleGitCommits.length.toLocaleString()} {visibleGitCommits.length === 1 ? "commit" : "commits"}</span>
+                  {gitHasActiveFilters && visibleGitCommits.length !== gitCommits.length && (
+                    <span className="muted-total">of {gitCommits.length.toLocaleString()}</span>
+                  )}
+                  {selectedGitProjectName && <span className="active-agent-label">{selectedGitProjectName}</span>}
+                  {selectedGitAuthorName && <span className="active-agent-label">{selectedGitAuthorName}</span>}
+                </>
               )}
             </div>
           </div>
-          <button
-            type="button"
-            className="secondary-button clear-filter-button"
-            onClick={clearFilters}
-            disabled={!hasActiveFilters}
-          >
-            <ClearFilterIcon />
-            Clear filters
-          </button>
+          <div className="transcript-header__actions">
+            <ViewSwitcher
+              value={viewMode}
+              onChange={handleViewModeChange}
+              disabled={!village || loadingVillage}
+            />
+            <button
+              type="button"
+              className="secondary-button clear-filter-button"
+              onClick={clearFilters}
+              disabled={!hasActiveFilters}
+            >
+              <ClearFilterIcon />
+              Clear filters
+            </button>
+          </div>
         </header>
 
-        <ContextToolbar
-          visibility={contextVisibility}
-          memoriesOpen={memoryLaunch !== null}
-          loadingActions={loadingActions}
-          disabled={!village || loadingVillage}
-          onToggle={handleContextToggle}
-          onToggleMemories={handleToggleMemories}
-        />
+        {viewMode === "timeline" ? (
+          <ContextToolbar
+            visibility={contextVisibility}
+            memoriesOpen={memoryLaunch !== null}
+            loadingActions={loadingActions}
+            disabled={!village || loadingVillage}
+            onToggle={handleContextToggle}
+            onToggleMemories={handleToggleMemories}
+          />
+        ) : (
+          <GitHistoryToolbar
+            search={gitSearch}
+            onSearchChange={setGitSearch}
+            sources={gitSources}
+            onToggleSource={handleToggleGitSource}
+            sort={gitSort}
+            onToggleSort={() => setGitSort((current) => current === "desc" ? "asc" : "desc")}
+            loading={loadingGitHistory}
+            loadingMessage={gitLoadingMessage}
+            disabled={!village || loadingVillage}
+            onReload={() => selectedDate && void loadGitHistoryForDate(selectedDate, true)}
+          />
+        )}
 
-        <nav className="mobile-room-switcher" aria-label="Rooms">
+        {viewMode === "timeline" && <nav className="mobile-room-switcher" aria-label="Rooms">
           <button
             type="button"
             aria-pressed={selectedRoomId === "all"}
@@ -455,15 +685,17 @@ export default function App() {
               {room.name}
             </button>
           ))}
-        </nav>
+        </nav>}
 
-        {error && (
+        {visibleError && (
           <div className="status-banner status-banner--error" role="alert">
-            <span>{error}</span>
+            <span>{visibleError}</span>
             <button
               type="button"
               onClick={() => {
-                if (village && selectedDate && anyActionsVisible && events.length === 0) {
+                if (viewMode === "git" && selectedDate) {
+                  void loadGitHistoryForDate(selectedDate, true);
+                } else if (village && selectedDate && anyActionsVisible && events.length === 0) {
                   void loadActionsForDate(village.id, selectedDate);
                 } else if (village && selectedDate) void handleSelectDate(selectedDate, true);
                 else void loadVillageBySlug(slugInput);
@@ -474,20 +706,28 @@ export default function App() {
           </div>
         )}
 
-        {loadingMessages && selectedDate && (
+        {viewMode === "timeline" && loadingMessages && selectedDate && (
           <div className="status-banner" role="status">
             Reading Day {selectedDate} from the public archive… Historical days can take a moment.
           </div>
         )}
 
         <div className="transcript-scroll" ref={transcriptRef}>
-          <TimelineList
-            items={timelineItems}
-            rooms={village?.rooms ?? []}
-            showRoomLabels={selectedRoomId === "all"}
-            loading={loadingMessages}
-            onOpenMemoryPair={handleOpenMemoryPair}
-          />
+          {viewMode === "timeline" ? (
+            <TimelineList
+              items={timelineItems}
+              rooms={village?.rooms ?? []}
+              showRoomLabels={selectedRoomId === "all"}
+              loading={loadingMessages}
+              onOpenMemoryPair={handleOpenMemoryPair}
+            />
+          ) : (
+            <GitHistoryList
+              commits={visibleGitCommits}
+              result={gitHistoryResult}
+              loading={loadingGitHistory}
+            />
+          )}
         </div>
       </main>
 
@@ -499,7 +739,7 @@ export default function App() {
 
       <MemoryInspector
         key={memoryLaunch?.key ?? 0}
-        open={memoryLaunch !== null}
+        open={viewMode === "timeline" && memoryLaunch !== null}
         agents={village?.agents ?? []}
         launch={memoryLaunch}
         onClose={() => setMemoryLaunch(null)}
