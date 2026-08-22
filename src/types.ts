@@ -40,6 +40,7 @@ export interface ApiVillage extends ApiVillageSummary {
 
 export interface ApiEventData {
   actionType?: string;
+  adminComment?: string;
   agentId?: string;
   answerToQuery?: string;
   approval?: boolean;
@@ -48,11 +49,13 @@ export interface ApiEventData {
   endDate?: string;
   estimatedDuration?: number;
   humanConstraints?: string;
+  humanUseSessionRequestId?: string;
   medium?: string;
   messageId?: string;
   messageContent?: string;
   nextSessionGoal?: string;
   nextShortDisplayedSessionGoal?: string;
+  outreachApprovalRequestId?: string;
   previousRoomId?: string;
   previousRoomName?: string;
   query?: string;
@@ -84,6 +87,48 @@ export interface ApiEventsResponse {
   windowDate?: string;
 }
 
+export interface HumanUseAgentAction {
+  action?: string;
+  content?: string;
+  estimatedDuration?: number;
+  instructions?: string;
+  [key: string]: unknown;
+}
+
+export interface HumanUseTurn {
+  id: string;
+  sessionId: string;
+  agentAction?: HumanUseAgentAction | null;
+  userResponseStatus?: string | null;
+  userResponseOutcome?: string | null;
+  userResponse?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface HumanUseSession {
+  id: string;
+  requestId: string;
+  userId?: string | null;
+  userIntro?: string | null;
+  hasEnded: boolean;
+  endReason?: string | null;
+  endComment?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  agentId: string;
+  sessionGoal?: string | null;
+  shortDisplayedSessionGoal?: string | null;
+  humanConstraints?: string | null;
+  turns: HumanUseTurn[];
+}
+
+export interface ApiHumanUseSessionsResponse {
+  sessions?: HumanUseSession[];
+  windowDate?: string;
+  error?: string;
+}
+
 export interface ChatMessage {
   id: string;
   eventIndex: number | null;
@@ -96,6 +141,24 @@ export interface ChatMessage {
 }
 
 export type ActivityKind = "pause" | "consolidation" | "other";
+
+export type HumanUseStatus = "active" | "finished" | "cancelled";
+export type OutreachStatus = "pending" | "approved" | "denied";
+export type ContextMessageKind = "human-helper" | "outreach-reason";
+
+export interface ContextChatMessage {
+  id: string;
+  eventIndex: number | null;
+  agentId: string;
+  speakerId: string;
+  speakerName: string;
+  speakerKind: SpeakerKind;
+  content: string;
+  roomId: string | null;
+  createdAt: string;
+  contextKind: ContextMessageKind;
+  badge: string;
+}
 
 export interface ActivityEvent {
   id: string;
@@ -110,6 +173,16 @@ export interface ActivityEvent {
   detail: string | null;
   seconds: number | null;
   nextSessionGoal: string | null;
+  status: HumanUseStatus | OutreachStatus | null;
+  request: string | null;
+  rationale: string | null;
+  reviewReason: string | null;
+  recipient: string | null;
+  medium: string | null;
+  humanConstraints: string | null;
+  estimatedDuration: number | null;
+  statusDetail: string | null;
+  chatMessages: ContextChatMessage[];
 }
 
 export interface MemoryVersion {
@@ -132,7 +205,13 @@ export interface MemoryPair {
 
 export type TimelineItem =
   | { kind: "message"; message: ChatMessage; createdAt: string; eventIndex: number | null }
-  | { kind: "activity"; activity: ActivityEvent; createdAt: string; eventIndex: number | null };
+  | { kind: "activity"; activity: ActivityEvent; createdAt: string; eventIndex: number | null }
+  | {
+      kind: "context-message";
+      message: ContextChatMessage;
+      createdAt: string;
+      eventIndex: number | null;
+    };
 
 export interface VillageData {
   id: string;

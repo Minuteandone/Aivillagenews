@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { buildTimelineItems, mapEventsToActivities } from "./activities";
 import { compactDiffLines, diffLines } from "./diff";
-import type { ApiAgent, ApiChatRoom, ApiEvent, ChatMessage } from "../types";
+import type {
+  ApiAgent,
+  ApiChatRoom,
+  ApiEvent,
+  ChatMessage,
+  HumanUseSession,
+} from "../types";
 
 const agents: ApiAgent[] = [
   { id: "agent-a", name: "Agent A" },
@@ -83,22 +89,41 @@ describe("action timeline", () => {
     const timeline = buildTimelineItems(
       [message],
       activities,
-      { messages: true, pauses: true, consolidations: false, otherActions: false },
+      {
+        messages: true,
+        pauses: true,
+        consolidations: false,
+        otherActions: false,
+        humanHelperChat: false,
+        outreachReasons: false,
+      },
       "all",
       "all",
     );
 
-    expect(timeline.map((item) => (item.kind === "message" ? item.message.id : item.activity.id))).toEqual([
-      "message",
-      "pause",
-    ]);
+    expect(
+      timeline.map((item) =>
+        item.kind === "message"
+          ? item.message.id
+          : item.kind === "activity"
+            ? item.activity.id
+            : item.message.id,
+      ),
+    ).toEqual(["message", "pause"]);
   });
 
   it("applies the existing room and agent filters to actions", () => {
     const timeline = buildTimelineItems(
       [message],
       activities,
-      { messages: false, pauses: true, consolidations: true, otherActions: true },
+      {
+        messages: false,
+        pauses: true,
+        consolidations: true,
+        otherActions: true,
+        humanHelperChat: false,
+        outreachReasons: false,
+      },
       "research",
       "agent-b",
     );
@@ -106,6 +131,195 @@ describe("action timeline", () => {
     expect(timeline).toHaveLength(1);
     expect(timeline[0]?.kind).toBe("activity");
     if (timeline[0]?.kind === "activity") expect(timeline[0].activity.id).toBe("consolidate");
+  });
+});
+
+describe("outreach and human-use context", () => {
+  const contextEvents: ApiEvent[] = [
+    {
+      id: "outreach-request",
+      eventIndex: 10,
+      createdAt: "2026-08-21T18:00:00.000Z",
+      data: {
+        actionType: "OUTREACH_APPROVAL_REQUEST",
+        agentId: "agent-b",
+        roomId: "general",
+        outreachApprovalRequestId: "outreach-1",
+        medium: "Email",
+        recipient: "A researcher",
+        messageContent: "Here is the exact email request.",
+        rationale: "The recipient can verify the result.",
+      },
+    },
+    {
+      id: "outreach-response",
+      eventIndex: 11,
+      createdAt: "2026-08-21T18:01:00.000Z",
+      data: {
+        actionType: "OUTREACH_APPROVAL_RESPONSE",
+        agentId: "agent-b",
+        roomId: "general",
+        outreachApprovalRequestId: "outreach-1",
+        approval: false,
+        adminComment: "Ask a teammate to send this instead.",
+      },
+    },
+    {
+      id: "human-cancelled",
+      eventIndex: 12,
+      createdAt: "2026-08-21T18:02:00.000Z",
+      data: {
+        actionType: "REQUEST_HUMAN_HELPER",
+        agentId: "agent-a",
+        roomId: "general",
+        humanUseSessionRequestId: "human-1",
+        sessionGoal: "Check the first page.",
+      },
+    },
+    {
+      id: "human-cancel",
+      eventIndex: 13,
+      createdAt: "2026-08-21T18:03:00.000Z",
+      data: {
+        actionType: "CANCEL_REQUEST_FOR_HUMAN_HELPER",
+        agentId: "agent-a",
+        roomId: "general",
+      },
+    },
+    {
+      id: "human-finished",
+      eventIndex: 14,
+      createdAt: "2026-08-21T18:04:00.000Z",
+      data: {
+        actionType: "REQUEST_HUMAN_HELPER",
+        agentId: "agent-a",
+        roomId: "general",
+        humanUseSessionRequestId: "human-2",
+        sessionGoal: "Give a quick UX reaction.",
+        humanConstraints: "Use any browser.",
+        estimatedDuration: 5,
+      },
+    },
+    {
+      id: "human-active",
+      eventIndex: 15,
+      createdAt: "2026-08-21T18:08:00.000Z",
+      data: {
+        actionType: "REQUEST_HUMAN_HELPER",
+        agentId: "agent-a",
+        roomId: "general",
+        humanUseSessionRequestId: "human-3",
+        sessionGoal: "Check one more screen.",
+      },
+    },
+  ];
+
+  const humanSessions: HumanUseSession[] = [
+    {
+      id: "session-2",
+      requestId: "human-2",
+      userId: "helper-1",
+      userIntro: "Hi, I can help.",
+      hasEnded: true,
+      endReason: "agent_ended",
+      endComment: "The requested UX check was complete.",
+      createdAt: "2026-08-21T18:04:30.000Z",
+      updatedAt: "2026-08-21T18:07:00.000Z",
+      agentId: "agent-a",
+      sessionGoal: "Give a quick UX reaction.",
+      humanConstraints: "Use any browser.",
+      turns: [
+        {
+          id: "human-turn",
+          sessionId: "session-2",
+          agentAction: {
+            action: "instruct_human_helper",
+            instructions: "Please open the page and describe the first screen.",
+          },
+          userResponseStatus: "responded",
+          userResponseOutcome: "success",
+          userResponse: "The main button is clear.",
+          createdAt: "2026-08-21T18:05:00.000Z",
+          updatedAt: "2026-08-21T18:06:00.000Z",
+        },
+      ],
+    },
+  ];
+
+  const contextActivities = mapEventsToActivities(
+    contextEvents,
+    agents,
+    rooms,
+    humanSessions,
+  );
+
+  it("folds outreach responses into the request with its denial reason", () => {
+    const outreach = contextActivities.find((activity) => activity.id === "outreach-request");
+    expect(outreach).toMatchObject({
+      status: "denied",
+      request: "Here is the exact email request.",
+      rationale: "The recipient can verify the result.",
+      reviewReason: "Ask a teammate to send this instead.",
+      medium: "Email",
+      recipient: "A researcher",
+    });
+    expect(contextActivities.some((activity) => activity.id === "outreach-response")).toBe(false);
+  });
+
+  it("reports human requests as cancelled, finished, or active and includes their chat", () => {
+    expect(
+      contextActivities.find((activity) => activity.id === "human-cancelled")?.status,
+    ).toBe("cancelled");
+
+    const finished = contextActivities.find((activity) => activity.id === "human-finished");
+    expect(finished).toMatchObject({
+      status: "finished",
+      request: "Give a quick UX reaction.",
+      humanConstraints: "Use any browser.",
+      estimatedDuration: 5,
+      statusDetail: "The requested UX check was complete.",
+    });
+    expect(finished?.chatMessages.map((message) => message.content)).toEqual([
+      "Hi, I can help.",
+      "Please open the page and describe the first screen.",
+      "The main button is clear.",
+    ]);
+
+    expect(contextActivities.find((activity) => activity.id === "human-active")?.status).toBe(
+      "active",
+    );
+    expect(contextActivities.some((activity) => activity.id === "human-cancel")).toBe(false);
+  });
+
+  it("shows helper chat and outreach reasons as message-style timeline items", () => {
+    const timeline = buildTimelineItems(
+      [],
+      contextActivities,
+      {
+        messages: false,
+        pauses: false,
+        consolidations: false,
+        otherActions: false,
+        humanHelperChat: true,
+        outreachReasons: true,
+      },
+      "general",
+      "all",
+    );
+
+    expect(timeline.every((item) => item.kind === "context-message")).toBe(true);
+    expect(timeline).toHaveLength(5);
+    expect(
+      timeline
+        .filter((item) => item.kind === "context-message")
+        .map((item) => item.message.badge),
+    ).toEqual([
+      "outreach reason",
+      "denial",
+      "helper chat",
+      "to helper",
+      "helper chat",
+    ]);
   });
 });
 

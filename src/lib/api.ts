@@ -2,10 +2,12 @@ import { mapCurrentMessages, mapEventsToMessages } from "./messages";
 import type {
   ApiEventsResponse,
   ApiEvent,
+  ApiHumanUseSessionsResponse,
   ApiMemoriesResponse,
   ApiVillage,
   ApiVillageSummary,
   ChatMessage,
+  HumanUseSession,
   MemoryPair,
   MemoryVersion,
   VillageData,
@@ -23,6 +25,7 @@ let transport: Transport = import.meta.env.DEV
     : "relay";
 const dayCache = new Map<string, ChatMessage[]>();
 const eventCache = new Map<string, ApiEvent[]>();
+const humanUseSessionCache = new Map<string, HumanUseSession[]>();
 const memoryCache = new Map<string, MemoryVersion[]>();
 
 export class VillageApiError extends Error {
@@ -204,6 +207,27 @@ export async function loadDayEvents(
   const events = response.events ?? [];
   eventCache.set(cacheKey, events);
   return events;
+}
+
+export async function loadHumanUseSessions(
+  villageId: string,
+  date: string,
+  signal?: AbortSignal,
+): Promise<HumanUseSession[]> {
+  const cacheKey = `${villageId}:${date}`;
+  const cached = humanUseSessionCache.get(cacheKey);
+  if (cached) return cached;
+
+  const response = await requestJson<ApiHumanUseSessionsResponse>(
+    `/api/human-use-sessions?villageId=${encodeURIComponent(villageId)}&date=${encodeURIComponent(date)}`,
+    signal,
+  );
+
+  if (response.error) throw new VillageApiError(response.error);
+
+  const sessions = response.sessions ?? [];
+  humanUseSessionCache.set(cacheKey, sessions);
+  return sessions;
 }
 
 export async function loadAgentMemories(

@@ -590,6 +590,42 @@ button:disabled {
   color: #715229;
 }
 
+.message-row--context {
+  margin: 5px 0;
+  padding: 13px 14px;
+  border: 1px solid #d7ddd4;
+  border-radius: 5px;
+  background: #f4f6f2;
+}
+
+.message-row--human-helper {
+  border-color: #d6ddcf;
+  background: #f1f5ee;
+}
+
+.message-row--outreach-reason {
+  border-color: #e2d8c7;
+  background: #f8f4ec;
+}
+
+.message-row__context-badge {
+  display: inline-flex;
+  min-height: 20px;
+  align-items: center;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: #e0e6dc;
+  color: #405047;
+  font-size: 0.66rem;
+  font-weight: 750;
+  text-transform: lowercase;
+}
+
+.message-row--outreach-reason .message-row__context-badge {
+  background: #eee2ce;
+  color: #6b4d27;
+}
+
 .message-row__content {
   max-width: 900px;
   margin: 0;
@@ -711,6 +747,40 @@ button:disabled {
   font-weight: 700;
 }
 
+.activity-row__status {
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: #e9ece7;
+  color: #505a51;
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.035em;
+  text-transform: uppercase;
+}
+
+.activity-row__status--approved,
+.activity-row__status--finished {
+  background: #dcebdc;
+  color: #28543a;
+}
+
+.activity-row__status--active,
+.activity-row__status--pending {
+  background: #f1e6cf;
+  color: #74531f;
+}
+
+.activity-row__status--cancelled,
+.activity-row__status--denied {
+  background: #f3ded8;
+  color: #793c34;
+}
+
+.activity-row__copy > .activity-row__subject {
+  color: #273e2e;
+  font-weight: 650;
+}
+
 .activity-row__details {
   margin-top: 4px;
   color: var(--muted);
@@ -720,6 +790,132 @@ button:disabled {
 .activity-row__details summary {
   width: fit-content;
   cursor: pointer;
+  font-weight: 700;
+}
+
+.activity-row__details--structured {
+  margin-top: 8px;
+}
+
+.activity-row__details--structured > summary {
+  padding: 5px 8px;
+  border: 1px solid #c5cec2;
+  border-radius: 4px;
+  background: #fff;
+  color: #31513d;
+}
+
+.activity-row__details--structured[open] > summary {
+  margin-bottom: 8px;
+  background: #edf2e9;
+}
+
+.activity-detail {
+  display: grid;
+  max-height: 560px;
+  gap: 10px;
+  overflow: auto;
+  padding: 10px;
+  border: 1px solid #d9dfd6;
+  border-radius: 4px;
+  background: #fff;
+  scrollbar-color: #bdc7bb transparent;
+  scrollbar-width: thin;
+}
+
+.activity-detail section {
+  min-width: 0;
+}
+
+.activity-detail section + section,
+.activity-detail__meta + section {
+  padding-top: 10px;
+  border-top: 1px solid #e6e9e4;
+}
+
+.activity-detail h4 {
+  margin: 0 0 5px;
+  color: #324238;
+  font-size: 0.68rem;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+
+.activity-detail .message-row__content,
+.activity-detail > section > p {
+  max-width: none;
+  margin: 0;
+  color: #303a33;
+  font-size: 0.78rem;
+  line-height: 1.48;
+}
+
+.activity-detail__meta {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+}
+
+.activity-detail__meta > div {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  gap: 10px;
+}
+
+.activity-detail__meta dt {
+  color: #6a746c;
+  font-size: 0.69rem;
+  font-weight: 750;
+}
+
+.activity-detail__meta dd {
+  margin: 0;
+  color: #303a33;
+  font-size: 0.76rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.activity-detail__empty {
+  color: #7a837c !important;
+  font-style: italic;
+}
+
+.activity-detail__chat {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.activity-detail__chat > li {
+  padding: 8px 9px;
+  border: 1px solid #e0e4de;
+  border-radius: 4px;
+  background: #f7f8f5;
+}
+
+.activity-detail__chat header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.activity-detail__chat header strong {
+  color: #25352b;
+  font-size: 0.72rem;
+}
+
+.activity-detail__chat header span,
+.activity-detail__chat header time {
+  color: #707a72;
+  font-size: 0.65rem;
+}
+
+.activity-detail__chat header span {
   font-weight: 700;
 }
 
@@ -1504,6 +1700,11 @@ button:disabled {
     padding: 15px 2px 16px;
   }
 
+  .message-row--context {
+    margin: 5px 0;
+    padding: 12px 10px;
+  }
+
   .agent-avatar--regular {
     width: 36px;
     height: 36px;
@@ -1542,6 +1743,16 @@ button:disabled {
     grid-column: 2;
     width: fit-content;
     margin-top: 3px;
+  }
+
+  .activity-detail {
+    max-height: 52dvh;
+    padding: 8px;
+  }
+
+  .activity-detail__meta > div {
+    grid-template-columns: 1fr;
+    gap: 2px;
   }
 
   .consolidation-diff-status,

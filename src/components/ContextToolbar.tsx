@@ -3,6 +3,8 @@ export interface ContextVisibility {
   pauses: boolean;
   consolidations: boolean;
   otherActions: boolean;
+  humanHelperChat: boolean;
+  outreachReasons: boolean;
 }
 
 interface ContextToolbarProps {
@@ -16,6 +18,8 @@ interface ContextToolbarProps {
 
 const CONTEXT_OPTIONS: Array<{ key: keyof ContextVisibility; label: string; mobileLabel?: string }> = [
   { key: "messages", label: "Messages" },
+  { key: "humanHelperChat", label: "Helper chat" },
+  { key: "outreachReasons", label: "Outreach reasons", mobileLabel: "Outreach" },
   { key: "pauses", label: "Pauses" },
   { key: "consolidations", label: "Consolidations" },
   { key: "otherActions", label: "Other actions", mobileLabel: "Other" },
@@ -63,4 +67,3 @@ export function ContextToolbar({
     </section>
   );
 }
-
