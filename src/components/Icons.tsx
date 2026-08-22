@@ -72,6 +72,16 @@ export function UsersIcon(props: IconProps) {
   );
 }
 
+export function AgentPageIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <circle cx="9" cy="8" r="3" />
+      <path d="M3.5 19v-1.5A5.5 5.5 0 0 1 9 12a5.5 5.5 0 0 1 5.5 5.5V19" />
+      <path d="M15 5h5.5v13H15M17.5 9h1M17.5 12h1M17.5 15h1" />
+    </IconBase>
+  );
+}
+
 export function HashIcon(props: IconProps) {
   return (
     <IconBase {...props}>

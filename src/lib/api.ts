@@ -2,6 +2,8 @@ import { mapCurrentMessages, mapEventsToMessages } from "./messages";
 import type {
   ApiEventsResponse,
   ApiEvent,
+  AgentProfilesIndex,
+  AgentStory,
   ApiHumanUseSessionsResponse,
   ApiMemoriesResponse,
   ApiVillage,
@@ -27,6 +29,8 @@ const dayCache = new Map<string, ChatMessage[]>();
 const eventCache = new Map<string, ApiEvent[]>();
 const humanUseSessionCache = new Map<string, HumanUseSession[]>();
 const memoryCache = new Map<string, MemoryVersion[]>();
+let agentProfilesCache: AgentProfilesIndex | null = null;
+const agentStoryCache = new Map<string, AgentStory>();
 
 export class VillageApiError extends Error {
   constructor(
@@ -61,6 +65,71 @@ export function parseRelayedJson<T>(text: string): T {
   } catch {
     throw new VillageApiError("The public data relay returned an unreadable response.");
   }
+}
+
+export function agentPageSlug(name: string): string {
+  return name
+    .normalize("NFKD")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+export function parseAgentStoryMarkdown(
+  relayedText: string,
+  agentName: string,
+  sourceUrl: string,
+): AgentStory {
+  const marker = "Markdown Content:";
+  const markerIndex = relayedText.indexOf(marker);
+  let markdown = (markerIndex >= 0
+    ? relayedText.slice(markerIndex + marker.length)
+    : relayedText
+  ).replace(/\r\n/g, "\n").trim();
+  const storyHeading = markdown.match(/^##\s+.+?(?:'s|’s) Story\s*$/im);
+
+  if (storyHeading?.index !== undefined) {
+    markdown = markdown.slice(storyHeading.index + storyHeading[0].length).trim();
+  } else {
+    markdown = markdown.replace(/^#\s+.+\n+/, "").trim();
+  }
+
+  const memoryHeading = markdown.search(/^##\s+Current Memory\s*$/im);
+  if (memoryHeading >= 0) markdown = markdown.slice(0, memoryHeading).trim();
+
+  const lines = markdown.split("\n");
+  const attributionLines: string[] = [];
+  while (lines.length > 0) {
+    const line = lines[0]!.trim();
+    if (!line) {
+      lines.shift();
+      continue;
+    }
+    if (/^(Summarized by|Updated\b)/i.test(line)) {
+      attributionLines.push(line);
+      lines.shift();
+      continue;
+    }
+    break;
+  }
+
+  markdown = lines
+    .join("\n")
+    .replace(/^\s*[“”]\s*$/gm, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+  if (!markdown) {
+    throw new VillageApiError(`The Village story for ${agentName} was empty.`);
+  }
+
+  return {
+    markdown,
+    sourceUrl,
+    attribution:
+      attributionLines.join(" ") ||
+      "AI-generated Village summary; it may contain inaccuracies.",
+  };
 }
 
 async function fetchDirect<T>(path: string, signal?: AbortSignal): Promise<T> {
@@ -160,12 +229,65 @@ export async function loadVillage(
     id: village.id,
     slug: village.slug,
     name: village.name,
+    villageGoal: village.villageGoal,
     agents: village.agents ?? [],
     rooms: village.chatRooms ?? [],
     dates,
     latestDate,
     latestMessages,
   };
+}
+
+export async function loadAgentProfilesIndex(
+  villageId: string,
+  signal?: AbortSignal,
+): Promise<AgentProfilesIndex> {
+  if (agentProfilesCache?.villageId === villageId) return agentProfilesCache;
+
+  const response = await fetch(`${import.meta.env.BASE_URL}data/agent-profiles.json`, {
+    signal,
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) {
+    throw new VillageApiError(`The agent profile index returned ${response.status}.`, response.status);
+  }
+
+  const index = (await response.json()) as AgentProfilesIndex;
+  if (index.villageId !== villageId) {
+    throw new VillageApiError(
+      "Lifetime agent profiles are currently indexed for the main Actual Launch village.",
+    );
+  }
+
+  agentProfilesCache = index;
+  return index;
+}
+
+export async function loadAgentStory(
+  agentName: string,
+  signal?: AbortSignal,
+): Promise<AgentStory> {
+  const slug = agentPageSlug(agentName);
+  const cached = agentStoryCache.get(slug);
+  if (cached) return cached;
+
+  const sourceUrl = `${API_ORIGIN}/agent/${slug}`;
+  const response = await fetch(`${RELAY_PREFIX}${sourceUrl}`, {
+    signal,
+    headers: { Accept: "text/plain" },
+  });
+  if (!response.ok) {
+    throw new VillageApiError(
+      response.status === 429
+        ? "The Village story relay is temporarily rate-limited."
+        : `The Village story returned ${response.status}.`,
+      response.status,
+    );
+  }
+
+  const story = parseAgentStoryMarkdown(await response.text(), agentName, sourceUrl);
+  agentStoryCache.set(slug, story);
+  return story;
 }
 
 export async function loadDayMessages(

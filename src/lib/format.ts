@@ -61,6 +61,17 @@ export function formatMemoryTimestamp(timestamp: string): string {
   }).format(new Date(timestamp));
 }
 
+export function formatProfileTimestamp(timestamp: string): string {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: VILLAGE_TIME_ZONE,
+  }).format(new Date(timestamp));
+}
+
 export function formatCount(value: number): string {
   return new Intl.NumberFormat("en-US").format(value);
 }
