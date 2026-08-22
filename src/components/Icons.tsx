@@ -96,3 +96,48 @@ export function RefreshIcon(props: IconProps) {
     </IconBase>
   );
 }
+
+export function PauseIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M9.5 8.5v7M14.5 8.5v7" />
+    </IconBase>
+  );
+}
+
+export function MemoryIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M7 4.5h10a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-11a2 2 0 0 1 2-2Z" />
+      <path d="M8.5 9h7M8.5 12h7M8.5 15h4.5" />
+      <path d="M8 2.5v4M12 2.5v4M16 2.5v4" />
+    </IconBase>
+  );
+}
+
+export function ChevronIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="m7.5 9.5 4.5 4.5 4.5-4.5" />
+    </IconBase>
+  );
+}
+
+export function CompareIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M5 8h13M15 5l3 3-3 3M19 16H6M9 13l-3 3 3 3" />
+    </IconBase>
+  );
+}
+
+export function HistoryIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M4 7v5h5" />
+      <path d="M5.5 12a7 7 0 1 0 2.1-5" />
+      <path d="M12 8v4l2.8 1.7" />
+    </IconBase>
+  );
+}
