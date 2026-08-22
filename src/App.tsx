@@ -17,6 +17,7 @@ import {
   getCachedDayEvents,
   loadDayEvents,
   loadDayMessages,
+  loadHumanUseSessions,
   loadVillage,
 } from "./lib/api";
 import { formatDateLong, pluralizeItems, pluralizeMessages } from "./lib/format";
@@ -25,7 +26,14 @@ import {
   buildRoomOptions,
   filterMessages,
 } from "./lib/messages";
-import type { ActivityEvent, ApiEvent, ChatMessage, MemoryPair, VillageData } from "./types";
+import type {
+  ActivityEvent,
+  ApiEvent,
+  ChatMessage,
+  HumanUseSession,
+  MemoryPair,
+  VillageData,
+} from "./types";
 
 const DEFAULT_SLUG = "actual-launch-1";
 
@@ -41,6 +49,7 @@ export default function App() {
   const [selectedDate, setSelectedDate] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [events, setEvents] = useState<ApiEvent[]>([]);
+  const [humanUseSessions, setHumanUseSessions] = useState<HumanUseSession[]>([]);
   const [selectedRoomId, setSelectedRoomId] = useState("all");
   const [selectedAgentId, setSelectedAgentId] = useState("all");
   const [loadingVillage, setLoadingVillage] = useState(false);
@@ -53,6 +62,8 @@ export default function App() {
     pauses: false,
     consolidations: false,
     otherActions: false,
+    humanHelperChat: false,
+    outreachReasons: false,
   });
   const [memoryLaunch, setMemoryLaunch] = useState<MemoryLaunch | null>(null);
   const [transportLabel, setTransportLabel] = useState("Checking the public archive route…");
@@ -91,8 +102,14 @@ export default function App() {
   );
 
   const activities = useMemo(
-    () => mapEventsToActivities(events, village?.agents ?? [], village?.rooms ?? []),
-    [events, village?.agents, village?.rooms],
+    () =>
+      mapEventsToActivities(
+        events,
+        village?.agents ?? [],
+        village?.rooms ?? [],
+        humanUseSessions,
+      ),
+    [events, humanUseSessions, village?.agents, village?.rooms],
   );
 
   const timelineItems = useMemo(
@@ -110,7 +127,9 @@ export default function App() {
   const anyActionsVisible =
     contextVisibility.pauses ||
     contextVisibility.consolidations ||
-    contextVisibility.otherActions;
+    contextVisibility.otherActions ||
+    contextVisibility.humanHelperChat ||
+    contextVisibility.outreachReasons;
   const contextChangesVisibleCount = anyActionsVisible || !contextVisibility.messages;
 
   const selectedRoomName = useMemo(() => {
@@ -140,10 +159,7 @@ export default function App() {
     async (villageId: string, date: string) => {
       const requestKey = `${villageId}:${date}`;
       const cached = getCachedDayEvents(villageId, date);
-      if (cached) {
-        setEvents(cached);
-        return;
-      }
+      if (cached) setEvents(cached);
       if (activityRequestKeyRef.current === requestKey) return;
 
       activityAbortRef.current?.abort();
@@ -154,8 +170,14 @@ export default function App() {
       setError("");
 
       try {
-        const loadedEvents = await loadDayEvents(villageId, date, controller.signal);
-        if (!controller.signal.aborted) setEvents(loadedEvents);
+        const [loadedEvents, loadedSessions] = await Promise.all([
+          loadDayEvents(villageId, date, controller.signal),
+          loadHumanUseSessions(villageId, date, controller.signal),
+        ]);
+        if (!controller.signal.aborted) {
+          setEvents(loadedEvents);
+          setHumanUseSessions(loadedSessions);
+        }
       } catch (caughtError) {
         const nextError = messageForError(caughtError);
         if (nextError && !controller.signal.aborted) setError(nextError);
@@ -186,6 +208,7 @@ export default function App() {
       setLoadingActions(false);
       setError("");
       setEvents([]);
+      setHumanUseSessions([]);
       setMemoryLaunch(null);
 
       try {
@@ -246,6 +269,7 @@ export default function App() {
       setSelectedDate(date);
       setMessages([]);
       setEvents([]);
+      setHumanUseSessions([]);
       setSelectedRoomId("all");
       setSelectedAgentId("all");
       setMemoryLaunch(null);
@@ -258,7 +282,7 @@ export default function App() {
         setMessages(loadedMessages);
         const cachedEvents = getCachedDayEvents(village.id, date);
         if (cachedEvents) setEvents(cachedEvents);
-        else if (actionsVisibleRef.current) void loadActionsForDate(village.id, date);
+        if (actionsVisibleRef.current) void loadActionsForDate(village.id, date);
         setDayMessageCounts((current) => {
           const next = new Map(current);
           next.set(date, loadedMessages.length);
@@ -291,7 +315,12 @@ export default function App() {
     (key: keyof ContextVisibility) => {
       const next = { ...contextVisibility, [key]: !contextVisibility[key] };
       setContextVisibility(next);
-      const nextActionsVisible = next.pauses || next.consolidations || next.otherActions;
+      const nextActionsVisible =
+        next.pauses ||
+        next.consolidations ||
+        next.otherActions ||
+        next.humanHelperChat ||
+        next.outreachReasons;
       actionsVisibleRef.current = nextActionsVisible;
       if (!nextActionsVisible) {
         activityAbortRef.current?.abort();

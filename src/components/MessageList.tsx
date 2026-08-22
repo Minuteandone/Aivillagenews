@@ -1,8 +1,9 @@
 import { Fragment, useMemo, useState } from "react";
-import { formatVillageTime } from "../lib/format";
+import { formatMemoryTimestamp, formatVillageTime } from "../lib/format";
 import type {
   ActivityEvent,
   ApiChatRoom,
+  ContextChatMessage,
   MemoryPair,
   TimelineItem,
 } from "../types";
@@ -20,6 +21,13 @@ interface TimelineListProps {
 function splitTrailingPunctuation(value: string): [string, string] {
   const match = value.match(/^(.*?)([.,!?;:]+)?$/);
   return [match?.[1] ?? value, match?.[2] ?? ""];
+}
+
+function formatEstimatedDuration(minutes: number): string {
+  if (minutes < 60) return `${minutes} ${minutes === 1 ? "minute" : "minutes"}`;
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  return `${hours}h${remainingMinutes ? ` ${remainingMinutes}m` : ""}`;
 }
 
 function MessageText({ content }: { content: string }) {
@@ -63,6 +71,148 @@ function LoadingRows() {
   );
 }
 
+function ContextMessageRow({
+  message,
+  roomName,
+  showRoomLabel,
+}: {
+  message: ContextChatMessage;
+  roomName: string | null;
+  showRoomLabel: boolean;
+}) {
+  return (
+    <li className={`message-row message-row--context message-row--${message.contextKind}`}>
+      <AgentAvatar
+        id={message.speakerId}
+        name={message.speakerName}
+        kind={message.speakerKind}
+      />
+      <article>
+        <header className="message-row__header">
+          <strong>{message.speakerName}</strong>
+          <time dateTime={message.createdAt}>{formatMemoryTimestamp(message.createdAt)}</time>
+          {showRoomLabel && roomName && (
+            <span className="message-row__room">#{roomName}</span>
+          )}
+          <span className="message-row__context-badge">{message.badge}</span>
+        </header>
+        <MessageText content={message.content} />
+      </article>
+    </li>
+  );
+}
+
+function ActivityChat({ messages }: { messages: ContextChatMessage[] }) {
+  if (messages.length === 0) {
+    return <p className="activity-detail__empty">No helper chat messages were recorded.</p>;
+  }
+
+  return (
+    <ol className="activity-detail__chat">
+      {messages.map((message) => (
+        <li key={message.id}>
+          <header>
+            <strong>{message.speakerName}</strong>
+            <span>{message.badge}</span>
+            <time dateTime={message.createdAt}>{formatMemoryTimestamp(message.createdAt)}</time>
+          </header>
+          <MessageText content={message.content} />
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function StructuredActionDetails({ activity }: { activity: ActivityEvent }) {
+  const isHumanUse = activity.actionType === "REQUEST_HUMAN_HELPER";
+  const isOutreach = activity.actionType === "OUTREACH_APPROVAL_REQUEST";
+  if (!isHumanUse && !isOutreach) return null;
+
+  const decisionLabel = activity.status === "denied" ? "Denial reason" : "Approval reason";
+
+  return (
+    <details className="activity-row__details activity-row__details--structured">
+      <summary>{isHumanUse ? "View request & chat" : "View request & review"}</summary>
+      <div className="activity-detail">
+        {isOutreach && (activity.medium || activity.recipient) && (
+          <dl className="activity-detail__meta">
+            {activity.medium && (
+              <div>
+                <dt>Medium</dt>
+                <dd>{activity.medium}</dd>
+              </div>
+            )}
+            {activity.recipient && (
+              <div>
+                <dt>Recipient</dt>
+                <dd>{activity.recipient}</dd>
+              </div>
+            )}
+          </dl>
+        )}
+
+        <section>
+          <h4>Request</h4>
+          {activity.request ? (
+            <MessageText content={activity.request} />
+          ) : (
+            <p className="activity-detail__empty">No request text was recorded.</p>
+          )}
+        </section>
+
+        {isOutreach && activity.rationale && (
+          <section>
+            <h4>Why the agent requested outreach</h4>
+            <MessageText content={activity.rationale} />
+          </section>
+        )}
+
+        {isOutreach && activity.status !== "pending" && (
+          <section>
+            <h4>{decisionLabel}</h4>
+            {activity.reviewReason ? (
+              <MessageText content={activity.reviewReason} />
+            ) : (
+              <p className="activity-detail__empty">No reviewer reason was provided.</p>
+            )}
+          </section>
+        )}
+
+        {isHumanUse && (
+          <>
+            {(activity.estimatedDuration !== null || activity.humanConstraints) && (
+              <dl className="activity-detail__meta">
+                {activity.estimatedDuration !== null && (
+                  <div>
+                    <dt>Estimated time</dt>
+                    <dd>{formatEstimatedDuration(activity.estimatedDuration)}</dd>
+                  </div>
+                )}
+                {activity.humanConstraints && (
+                  <div>
+                    <dt>Helper requirements</dt>
+                    <dd>{activity.humanConstraints}</dd>
+                  </div>
+                )}
+              </dl>
+            )}
+            {activity.statusDetail && (
+              <section>
+                <h4>Status note</h4>
+                <p>{activity.statusDetail}</p>
+              </section>
+            )}
+            <section>
+              <h4>Human helper chat</h4>
+              <ActivityChat messages={activity.chatMessages} />
+            </section>
+          </>
+        )}
+      </div>
+    </details>
+  );
+}
+
 interface ActivityRowProps {
   activity: ActivityEvent;
   roomName: string | null;
@@ -78,6 +228,9 @@ function ActivityRow({
 }: ActivityRowProps) {
   const [expanded, setExpanded] = useState(false);
   const isConsolidation = activity.kind === "consolidation";
+  const isStructuredAction =
+    activity.actionType === "REQUEST_HUMAN_HELPER" ||
+    activity.actionType === "OUTREACH_APPROVAL_REQUEST";
   const icon =
     activity.kind === "pause" ? (
       <span className="activity-row__icon activity-row__icon--pause">
@@ -102,15 +255,24 @@ function ActivityRow({
             <strong>{activity.agentName}</strong>
             <time dateTime={activity.createdAt}>{formatVillageTime(activity.createdAt)}</time>
             {isConsolidation && <span className="activity-row__badge">Consolidated memory</span>}
+            {activity.status && (
+              <span className={`activity-row__status activity-row__status--${activity.status}`}>
+                {activity.status}
+              </span>
+            )}
             {showRoomLabel && roomName && <span className="message-row__room">#{roomName}</span>}
           </header>
           <p>{isConsolidation ? (activity.detail ?? activity.summary) : activity.summary}</p>
-          {!isConsolidation && activity.detail && (
+          {isStructuredAction && activity.detail && (
+            <p className="activity-row__subject">{activity.detail}</p>
+          )}
+          {!isConsolidation && !isStructuredAction && activity.detail && (
             <details className="activity-row__details">
               <summary>View details</summary>
               <p>{activity.detail}</p>
             </details>
           )}
+          {isStructuredAction && <StructuredActionDetails activity={activity} />}
         </div>
         {isConsolidation && (
           <button
@@ -170,6 +332,17 @@ export function TimelineList({
               showRoomLabel={showRoomLabels}
               onOpenMemoryPair={onOpenMemoryPair}
               key={`activity-${item.activity.id}`}
+            />
+          );
+        }
+
+        if (item.kind === "context-message") {
+          return (
+            <ContextMessageRow
+              message={item.message}
+              roomName={item.message.roomId ? (roomNames.get(item.message.roomId) ?? null) : null}
+              showRoomLabel={showRoomLabels}
+              key={`context-${item.message.id}`}
             />
           );
         }

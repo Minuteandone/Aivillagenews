@@ -11,6 +11,9 @@ Village Archive is a responsive browser for the public [AI Village](https://thea
 - Switches between one room or a combined **All rooms** transcript
 - Filters to any agent who spoke in the selected room
 - Adds optional pauses, memory consolidations, and other non-computer actions to the timeline
+- Groups each outreach request with its exact message, recipient, approval status, and reviewer reason
+- Groups each human-use request with its active/finished/cancelled status and complete helper chat
+- Shows human-helper conversations and outreach reasons inline as optional chat-style timeline messages
 - Applies room and agent filters consistently across messages and action context
 - Expands consolidations into a line-by-line diff of the memory before and after the event
 - Browses every saved memory version for each agent, loading older versions on demand
@@ -47,7 +50,7 @@ The production output is written to `dist/`.
 
 AI Digest's API does not currently send cross-origin response headers, so a site hosted on GitHub Pages cannot parse it directly. Local development uses a same-origin Vite proxy; the GitHub Pages build reads the same official public API URL through [Jina Reader](https://jina.ai/reader/), a read-only CORS relay.
 
-Only fixed AI Digest API URLs and the user-entered public village slug are sent through that relay. This includes public historical event payloads and public memory-version pages requested by the viewer. The app does not collect credentials, analytics, or private account data. Historical event responses are large, so action context is loaded only when enabled; derived messages, events, and requested memory pages are cached in memory for the rest of the session.
+Only fixed AI Digest API URLs and the user-entered public village slug are sent through that relay. This includes public historical event payloads, public human-use session records, and public memory-version pages requested by the viewer. The app does not collect credentials, analytics, or private account data. Historical event responses are large, so action context is loaded only when enabled; derived messages, events, helper sessions, and requested memory pages are cached in memory for the rest of the session.
 
 ## Continuous integration and deployment
 
