@@ -7,7 +7,7 @@ import { AgentProfilePage } from "./components/AgentProfilePage";
 import { FiltersPanel } from "./components/FiltersPanel";
 import { GitHistoryList } from "./components/GitHistoryList";
 import { GitHistoryToolbar } from "./components/GitHistoryToolbar";
-import { ClearFilterIcon, FilterIcon, HashIcon } from "./components/Icons";
+import { ClearFilterIcon, DownloadIcon, FilterIcon, HashIcon } from "./components/Icons";
 import {
   MemoryInspector,
   type MemoryLaunch,
@@ -17,6 +17,7 @@ import { MobileFilterDrawer } from "./components/MobileFilterDrawer";
 import { ViewSwitcher, type ArchiveView } from "./components/ViewSwitcher";
 import { buildTimelineItems, mapEventsToActivities } from "./lib/activities";
 import { agentHash, parseAgentHash } from "./lib/agentRoutes";
+import { buildDayEventsExport, downloadDayEventsExport } from "./lib/dayExport";
 import {
   activeTransport,
   agentPageSlug,
@@ -52,6 +53,13 @@ import type {
 } from "./types";
 
 const DEFAULT_SLUG = "actual-launch-1";
+
+interface DayExportStatus {
+  kind: "idle" | "loading" | "success" | "error";
+  message: string;
+}
+
+const IDLE_DAY_EXPORT: DayExportStatus = { kind: "idle", message: "" };
 
 function messageForError(error: unknown): string {
   if (error instanceof DOMException && error.name === "AbortError") return "";
@@ -101,12 +109,14 @@ export default function App() {
   const [memoryLaunch, setMemoryLaunch] = useState<MemoryLaunch | null>(null);
   const [transportLabel, setTransportLabel] = useState("Checking the public archive route…");
   const [dayMessageCounts, setDayMessageCounts] = useState<Map<string, number>>(new Map());
+  const [dayExportStatus, setDayExportStatus] = useState<DayExportStatus>(IDLE_DAY_EXPORT);
 
   const villageAbortRef = useRef<AbortController | null>(null);
   const dayAbortRef = useRef<AbortController | null>(null);
   const activityAbortRef = useRef<AbortController | null>(null);
   const gitHistoryAbortRef = useRef<AbortController | null>(null);
   const agentProfilesAbortRef = useRef<AbortController | null>(null);
+  const dayExportAbortRef = useRef<AbortController | null>(null);
   const activityRequestKeyRef = useRef<string | null>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
   const didInitialLoadRef = useRef(false);
@@ -360,6 +370,7 @@ export default function App() {
       activityAbortRef.current?.abort();
       gitHistoryAbortRef.current?.abort();
       agentProfilesAbortRef.current?.abort();
+      dayExportAbortRef.current?.abort();
       activityRequestKeyRef.current = null;
       const controller = new AbortController();
       villageAbortRef.current = controller;
@@ -380,6 +391,7 @@ export default function App() {
       setSelectedGitAuthorId("all");
       setGitSearch("");
       setMemoryLaunch(null);
+      setDayExportStatus(IDLE_DAY_EXPORT);
 
       try {
         const loadedVillage = await loadVillage(slug, controller.signal);
@@ -427,6 +439,7 @@ export default function App() {
       activityAbortRef.current?.abort();
       gitHistoryAbortRef.current?.abort();
       agentProfilesAbortRef.current?.abort();
+      dayExportAbortRef.current?.abort();
       activityRequestKeyRef.current = null;
     };
   }, [loadVillageBySlug]);
@@ -495,6 +508,7 @@ export default function App() {
       dayAbortRef.current?.abort();
       activityAbortRef.current?.abort();
       gitHistoryAbortRef.current?.abort();
+      dayExportAbortRef.current?.abort();
       activityRequestKeyRef.current = null;
       const controller = new AbortController();
       dayAbortRef.current = controller;
@@ -510,6 +524,7 @@ export default function App() {
       setSelectedGitAuthorId("all");
       setGitSearch("");
       setMemoryLaunch(null);
+      setDayExportStatus(IDLE_DAY_EXPORT);
       setLoadingMessages(true);
       setLoadingActions(false);
       setError("");
@@ -702,6 +717,36 @@ export default function App() {
     }
   }, [selectedProfileAgent]);
 
+  const handleDownloadDayEvents = useCallback(async () => {
+    if (!village || !selectedDate || dayExportStatus.kind === "loading") return;
+
+    dayExportAbortRef.current?.abort();
+    const controller = new AbortController();
+    dayExportAbortRef.current = controller;
+    setDayExportStatus({
+      kind: "loading",
+      message: `Collecting every event from ${formatDateLong(selectedDate)}…`,
+    });
+
+    try {
+      const loadedEvents = await loadDayEvents(village.id, selectedDate, controller.signal);
+      if (controller.signal.aborted) return;
+
+      const archive = buildDayEventsExport(village, selectedDate, loadedEvents);
+      const downloaded = downloadDayEventsExport(archive);
+      setEvents(loadedEvents);
+      setDayExportStatus({
+        kind: "success",
+        message: `Downloaded ${loadedEvents.length.toLocaleString()} events as ${downloaded.filename}.`,
+      });
+    } catch (caughtError) {
+      const nextError = messageForError(caughtError);
+      if (nextError && !controller.signal.aborted) {
+        setDayExportStatus({ kind: "error", message: nextError });
+      }
+    }
+  }, [dayExportStatus.kind, selectedDate, village]);
+
   const filtersProps = {
     slugInput,
     onSlugInputChange: setSlugInput,
@@ -820,6 +865,25 @@ export default function App() {
             {viewMode !== "agents" && (
               <button
                 type="button"
+                className="secondary-button day-export-button"
+                onClick={() => void handleDownloadDayEvents()}
+                disabled={
+                  !village ||
+                  !selectedDate ||
+                  loadingVillage ||
+                  dayExportStatus.kind === "loading"
+                }
+                title={selectedDate ? `Download every event from ${selectedDate} as JSON` : undefined}
+              >
+                <DownloadIcon />
+                <span className="day-export-button__label">
+                  {dayExportStatus.kind === "loading" ? "Preparing JSON…" : "Download JSON"}
+                </span>
+              </button>
+            )}
+            {viewMode !== "agents" && (
+              <button
+                type="button"
                 className="secondary-button clear-filter-button"
                 onClick={clearFilters}
                 disabled={!hasActiveFilters}
@@ -892,6 +956,24 @@ export default function App() {
             >
               Retry
             </button>
+          </div>
+        )}
+
+        {viewMode !== "agents" && dayExportStatus.kind !== "idle" && (
+          <div
+            className={`status-banner day-export-status day-export-status--${dayExportStatus.kind}`}
+            role={dayExportStatus.kind === "error" ? "alert" : "status"}
+          >
+            <span>{dayExportStatus.message}</span>
+            {dayExportStatus.kind === "error" ? (
+              <button type="button" onClick={() => void handleDownloadDayEvents()}>
+                Retry
+              </button>
+            ) : dayExportStatus.kind === "success" ? (
+              <button type="button" onClick={() => setDayExportStatus(IDLE_DAY_EXPORT)}>
+                Dismiss
+              </button>
+            ) : null}
           </div>
         )}
 
