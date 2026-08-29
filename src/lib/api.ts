@@ -319,14 +319,26 @@ export async function loadDayEvents(
   const cached = eventCache.get(cacheKey);
   if (cached) return cached;
 
-  const response = await requestJson<ApiEventsResponse>(
-    `/api/events?villageId=${encodeURIComponent(villageId)}&date=${encodeURIComponent(date)}&page=1`,
-    signal,
-  );
+  const events: ApiEvent[] = [];
+  const maximumPages = 100;
 
-  if (response.error) throw new VillageApiError(response.error);
+  for (let page = 1; page <= maximumPages; page += 1) {
+    const response = await requestJson<ApiEventsResponse>(
+      `/api/events?villageId=${encodeURIComponent(villageId)}&date=${encodeURIComponent(date)}&page=${page}`,
+      signal,
+    );
 
-  const events = response.events ?? [];
+    if (response.error) throw new VillageApiError(response.error);
+    events.push(...(response.events ?? []));
+    if (!response.hasMore) break;
+
+    if (page === maximumPages) {
+      throw new VillageApiError(
+        "This day contains more event pages than the archive can safely download.",
+      );
+    }
+  }
+
   eventCache.set(cacheKey, events);
   return events;
 }

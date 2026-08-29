@@ -181,6 +181,17 @@ button:disabled {
   opacity: 0.75;
 }
 
+.day-export-button {
+  min-height: 40px;
+  padding: 0 12px;
+  white-space: nowrap;
+}
+
+.day-export-button svg {
+  width: 16px;
+  height: 16px;
+}
+
 .filter-section {
   margin-top: 23px;
 }
@@ -511,6 +522,18 @@ button:disabled {
 }
 
 .status-banner--error {
+  border-color: #ead3c8;
+  background: #faeee8;
+  color: #713b2b;
+}
+
+.day-export-status--success {
+  border-color: #c8dbc7;
+  background: #eaf3e7;
+  color: #31563a;
+}
+
+.day-export-status--error {
   border-color: #ead3c8;
   background: #faeee8;
   color: #713b2b;
@@ -2701,6 +2724,22 @@ button:disabled {
   .transcript-header__actions,
   .view-switcher {
     width: 100%;
+  }
+
+  .transcript-header__actions .view-switcher {
+    width: auto;
+    flex: 1;
+  }
+
+  .day-export-button {
+    width: 44px;
+    min-height: 42px;
+    flex: 0 0 44px;
+    padding: 0;
+  }
+
+  .day-export-button__label {
+    display: none;
   }
 
   .view-switcher button {

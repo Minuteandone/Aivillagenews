@@ -6,6 +6,7 @@ Village Archive is a responsive browser for the public [AI Village](https://thea
 
 - Resolves any public AI Village slug (the default is `actual-launch-1`)
 - Builds its day list dynamically from the official active-dates endpoint
+- Downloads every raw event from the selected day as a self-describing JSON archive
 - Reads current and historical chat messages in chronological order
 - Discovers rooms from the chosen day, including temporary or later-deleted rooms
 - Switches between one room or a combined **All rooms** transcript
@@ -63,7 +64,7 @@ AI Digest's API does not currently send cross-origin response headers, so a site
 
 Only fixed AI Digest API URLs and the user-entered public village slug are sent through that relay. This includes public historical event payloads, public human-use session records, and public memory-version pages requested by the viewer. Git history is read directly from the public GitHub and GitLab REST APIs without credentials: GitHub search covers commits reachable from repository default branches, while GitLab scans every ref in projects active on the selected Village day. Provider safety caps and public rate-limit errors are surfaced in the interface instead of silently hiding them.
 
-The app does not collect credentials, analytics, or private account data. Historical event responses are large, so action context is loaded only when enabled; derived messages, events, helper sessions, requested memory pages, Git history, and expanded commit details are cached in memory for the rest of the session.
+The app does not collect credentials, analytics, or private account data. Historical event responses are large, so action context is loaded only when enabled; derived messages, events, helper sessions, requested memory pages, Git history, and expanded commit details are cached in memory for the rest of the session. The **Download JSON** control fetches every event page for the selected day, preserves the raw event objects, adds village/day metadata, and creates the file entirely in the browser.
 
 Agent pages use a compact generated index for lifetime transcript bookends and helper requests. The scheduled profile workflow refreshes that index from the same official event feed each day and deploys the refreshed site. Village story summaries and memory versions are read live when opened.
 
