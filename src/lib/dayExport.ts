@@ -1,11 +1,12 @@
-import type { ApiEvent, VillageData } from "../types";
+import { mapEventsToMessages } from "./messages";
+import type { ApiEvent, ChatMessage, VillageData } from "../types";
 
 const EXPORT_SOURCE_URL = "https://theaidigest.org/village";
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
-export interface DayEventsExport {
+export interface DayMessagesExport {
   schemaVersion: 1;
-  exportType: "ai-village-day-events";
+  exportType: "ai-village-day-messages";
   exportedAt: string;
   sourceUrl: string;
   village: {
@@ -18,47 +19,51 @@ export interface DayEventsExport {
   };
   day: {
     date: string;
-    eventCount: number;
-    firstEventAt: string | null;
-    lastEventAt: string | null;
+    messageCount: number;
+    firstMessageAt: string | null;
+    lastMessageAt: string | null;
   };
-  events: ApiEvent[];
+  messages: ChatMessage[];
 }
 
-function eventBounds(events: ApiEvent[]): { firstEventAt: string | null; lastEventAt: string | null } {
-  let firstEventAt: string | null = null;
-  let lastEventAt: string | null = null;
+function messageBounds(messages: ChatMessage[]): {
+  firstMessageAt: string | null;
+  lastMessageAt: string | null;
+} {
+  let firstMessageAt: string | null = null;
+  let lastMessageAt: string | null = null;
   let firstTime = Number.POSITIVE_INFINITY;
   let lastTime = Number.NEGATIVE_INFINITY;
 
-  for (const event of events) {
-    const timestamp = Date.parse(event.createdAt);
+  for (const message of messages) {
+    const timestamp = Date.parse(message.createdAt);
     if (!Number.isFinite(timestamp)) continue;
 
     if (timestamp < firstTime) {
       firstTime = timestamp;
-      firstEventAt = event.createdAt;
+      firstMessageAt = message.createdAt;
     }
     if (timestamp > lastTime) {
       lastTime = timestamp;
-      lastEventAt = event.createdAt;
+      lastMessageAt = message.createdAt;
     }
   }
 
-  return { firstEventAt, lastEventAt };
+  return { firstMessageAt, lastMessageAt };
 }
 
-export function buildDayEventsExport(
+export function buildDayMessagesExport(
   village: VillageData,
   date: string,
   events: ApiEvent[],
   exportedAt = new Date(),
-): DayEventsExport {
+): DayMessagesExport {
   if (!DATE_PATTERN.test(date)) throw new Error("A valid archive date is required for export.");
+  const messages = mapEventsToMessages(events, village.agents);
 
   return {
     schemaVersion: 1,
-    exportType: "ai-village-day-events",
+    exportType: "ai-village-day-messages",
     exportedAt: exportedAt.toISOString(),
     sourceUrl: EXPORT_SOURCE_URL,
     village: {
@@ -71,14 +76,14 @@ export function buildDayEventsExport(
     },
     day: {
       date,
-      eventCount: events.length,
-      ...eventBounds(events),
+      messageCount: messages.length,
+      ...messageBounds(messages),
     },
-    events,
+    messages,
   };
 }
 
-export function dayEventsFilename(slug: string, date: string): string {
+export function dayMessagesFilename(slug: string, date: string): string {
   const safeSlug = slug
     .normalize("NFKD")
     .toLowerCase()
@@ -86,16 +91,19 @@ export function dayEventsFilename(slug: string, date: string): string {
     .replace(/^-+|-+$/g, "")
     .slice(0, 80) || "village";
   const safeDate = DATE_PATTERN.test(date) ? date : "unknown-date";
-  return `${safeSlug}-${safeDate}-events.json`;
+  return `${safeSlug}-${safeDate}-messages.json`;
 }
 
-export function serializeDayEventsExport(value: DayEventsExport): string {
+export function serializeDayMessagesExport(value: DayMessagesExport): string {
   return `${JSON.stringify(value, null, 2)}\n`;
 }
 
-export function downloadDayEventsExport(value: DayEventsExport): { filename: string; bytes: number } {
-  const filename = dayEventsFilename(value.village.slug, value.day.date);
-  const contents = serializeDayEventsExport(value);
+export function downloadDayMessagesExport(value: DayMessagesExport): {
+  filename: string;
+  bytes: number;
+} {
+  const filename = dayMessagesFilename(value.village.slug, value.day.date);
+  const contents = serializeDayMessagesExport(value);
   const blob = new Blob([contents], { type: "application/json;charset=utf-8" });
   const objectUrl = URL.createObjectURL(blob);
   const link = document.createElement("a");
