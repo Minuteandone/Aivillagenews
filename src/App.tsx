@@ -17,7 +17,7 @@ import { MobileFilterDrawer } from "./components/MobileFilterDrawer";
 import { ViewSwitcher, type ArchiveView } from "./components/ViewSwitcher";
 import { buildTimelineItems, mapEventsToActivities } from "./lib/activities";
 import { agentHash, parseAgentHash } from "./lib/agentRoutes";
-import { buildDayEventsExport, downloadDayEventsExport } from "./lib/dayExport";
+import { buildDayMessagesExport, downloadDayMessagesExport } from "./lib/dayExport";
 import {
   activeTransport,
   agentPageSlug,
@@ -717,7 +717,7 @@ export default function App() {
     }
   }, [selectedProfileAgent]);
 
-  const handleDownloadDayEvents = useCallback(async () => {
+  const handleDownloadDayMessages = useCallback(async () => {
     if (!village || !selectedDate || dayExportStatus.kind === "loading") return;
 
     dayExportAbortRef.current?.abort();
@@ -725,19 +725,19 @@ export default function App() {
     dayExportAbortRef.current = controller;
     setDayExportStatus({
       kind: "loading",
-      message: `Collecting every event from ${formatDateLong(selectedDate)}…`,
+      message: `Collecting every message from ${formatDateLong(selectedDate)}…`,
     });
 
     try {
       const loadedEvents = await loadDayEvents(village.id, selectedDate, controller.signal);
       if (controller.signal.aborted) return;
 
-      const archive = buildDayEventsExport(village, selectedDate, loadedEvents);
-      const downloaded = downloadDayEventsExport(archive);
+      const archive = buildDayMessagesExport(village, selectedDate, loadedEvents);
+      const downloaded = downloadDayMessagesExport(archive);
       setEvents(loadedEvents);
       setDayExportStatus({
         kind: "success",
-        message: `Downloaded ${loadedEvents.length.toLocaleString()} events as ${downloaded.filename}.`,
+        message: `Downloaded ${pluralizeMessages(archive.day.messageCount)} as ${downloaded.filename}.`,
       });
     } catch (caughtError) {
       const nextError = messageForError(caughtError);
@@ -866,14 +866,14 @@ export default function App() {
               <button
                 type="button"
                 className="secondary-button day-export-button"
-                onClick={() => void handleDownloadDayEvents()}
+                onClick={() => void handleDownloadDayMessages()}
                 disabled={
                   !village ||
                   !selectedDate ||
                   loadingVillage ||
                   dayExportStatus.kind === "loading"
                 }
-                title={selectedDate ? `Download every event from ${selectedDate} as JSON` : undefined}
+                title={selectedDate ? `Download every message from ${selectedDate} as JSON` : undefined}
               >
                 <DownloadIcon />
                 <span className="day-export-button__label">
@@ -966,7 +966,7 @@ export default function App() {
           >
             <span>{dayExportStatus.message}</span>
             {dayExportStatus.kind === "error" ? (
-              <button type="button" onClick={() => void handleDownloadDayEvents()}>
+              <button type="button" onClick={() => void handleDownloadDayMessages()}>
                 Retry
               </button>
             ) : dayExportStatus.kind === "success" ? (
