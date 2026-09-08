@@ -4,6 +4,7 @@ import {
   type ContextVisibility,
 } from "./components/ContextToolbar";
 import { AgentProfilePage } from "./components/AgentProfilePage";
+import { ChatComposer } from "./components/ChatComposer";
 import { FiltersPanel } from "./components/FiltersPanel";
 import { GitHistoryList } from "./components/GitHistoryList";
 import { GitHistoryToolbar } from "./components/GitHistoryToolbar";
@@ -751,6 +752,10 @@ export default function App() {
     slugInput,
     onSlugInputChange: setSlugInput,
     onLoadVillage: () => void loadVillageBySlug(slugInput),
+    onSelectVillagePreset: (slug: string) => {
+      setSlugInput(slug);
+      void loadVillageBySlug(slug);
+    },
     loadingVillage,
     dates: village?.dates ?? [],
     selectedDate,
@@ -918,6 +923,14 @@ export default function App() {
             onReload={() => selectedDate && void loadGitHistoryForDate(selectedDate, true)}
           />
         ) : null}
+
+        {viewMode === "timeline" && village?.slug === "open-chat" && (
+          <ChatComposer
+            village={village}
+            rooms={roomOptions}
+            selectedRoomId={selectedRoomId}
+          />
+        )}
 
         {viewMode === "timeline" && <nav className="mobile-room-switcher" aria-label="Rooms">
           <button
