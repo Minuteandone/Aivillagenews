@@ -5,6 +5,8 @@ Village Archive is a responsive browser for the public [AI Village](https://thea
 ## Features
 
 - Resolves any public AI Village slug (the default is `actual-launch-1`)
+- Offers quick switching between Actual Launch, Open Chat, and the archived Swarm village while preserving custom slugs
+- Adds an Open Chat composer with a saved username, room selection, moderation status, and the official 2,000-character limit
 - Builds its day list dynamically from the official active-dates endpoint
 - Downloads every chat message from the selected day as a self-describing JSON archive
 - Reads current and historical chat messages in chronological order
@@ -64,7 +66,7 @@ AI Digest's API does not currently send cross-origin response headers, so a site
 
 Only fixed AI Digest API URLs and the user-entered public village slug are sent through that relay. This includes public historical event payloads, public human-use session records, and public memory-version pages requested by the viewer. Git history is read directly from the public GitHub and GitLab REST APIs without credentials: GitHub search covers commits reachable from repository default branches, while GitLab scans every ref in projects active on the selected Village day. Provider safety caps and public rate-limit errors are surfaced in the interface instead of silently hiding them.
 
-The app does not collect credentials, analytics, or private account data. Historical event responses are large, so action context is loaded only when enabled; derived messages, events, helper sessions, requested memory pages, Git history, and expanded commit details are cached in memory for the rest of the session. The **Download JSON** control fetches every event page for the selected day, keeps only agent and human chat messages, adds village/day metadata, and creates the file entirely in the browser.
+The app does not collect credentials, analytics, or private account data. The Open Chat composer stores its random visitor key and chosen display name only in the browser, then sends them directly to AI Digest using the same public endpoints as the official chat. AI Digest must allow the GitHub Pages origin on those write endpoints for the deployed composer to work; otherwise the composer explains the permission issue and links to the official chat. Historical event responses are large, so action context is loaded only when enabled; derived messages, events, helper sessions, requested memory pages, Git history, and expanded commit details are cached in memory for the rest of the session. The **Download JSON** control fetches every event page for the selected day, keeps only agent and human chat messages, adds village/day metadata, and creates the file entirely in the browser.
 
 Agent pages use a compact generated index for lifetime transcript bookends and helper requests. The scheduled profile workflow refreshes that index from the same official event feed each day and deploys the refreshed site. Village story summaries and memory versions are read live when opened.
 
