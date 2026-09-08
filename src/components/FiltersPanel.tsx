@@ -17,6 +17,7 @@ interface FiltersPanelProps {
   slugInput: string;
   onSlugInputChange: (value: string) => void;
   onLoadVillage: () => void;
+  onSelectVillagePreset: (slug: string) => void;
   loadingVillage: boolean;
   dates: string[];
   selectedDate: string;
@@ -48,6 +49,7 @@ export function FiltersPanel({
   slugInput,
   onSlugInputChange,
   onLoadVillage,
+  onSelectVillagePreset,
   loadingVillage,
   dates,
   selectedDate,
@@ -83,6 +85,24 @@ export function FiltersPanel({
       {!mobile && <div className="app-title">Village Archive</div>}
 
       <form className="slug-form" onSubmit={handleSubmit}>
+        <label htmlFor={mobile ? "mobile-village-preset" : "village-preset"}>Quick villages</label>
+        <select
+          id={mobile ? "mobile-village-preset" : "village-preset"}
+          value={
+            ["actual-launch-1", "open-chat", "swarm"].includes(slugInput.trim())
+              ? slugInput.trim()
+              : "custom"
+          }
+          onChange={(event) => {
+            if (event.target.value !== "custom") onSelectVillagePreset(event.target.value);
+          }}
+          disabled={loadingVillage}
+        >
+          <option value="actual-launch-1">Actual Launch · default</option>
+          <option value="open-chat">Open Chat</option>
+          <option value="swarm">Swarm · archived</option>
+          <option value="custom" disabled>Custom slug</option>
+        </select>
         <label htmlFor={mobile ? "mobile-village-slug" : "village-slug"}>Village slug</label>
         <input
           id={mobile ? "mobile-village-slug" : "village-slug"}
